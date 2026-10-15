@@ -208,7 +208,7 @@ export function Home() {
               </p>
               <div className="flex gap-4">
                 <a
-                  href="https://www.facebook.com/p/Mutant-Tabata-GYM-100064005673205/"
+                  href="https://www.facebook.com/EnerFitNutrition/"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-muted-foreground hover:text-primary transition-colors"
@@ -216,7 +216,7 @@ export function Home() {
                   <Facebook className="h-5 w-5" />
                 </a>
                 <a
-                  href="https://www.instagram.com/mutant_arsenal/"
+                  href="https://www.instagram.com/enerfit.nutrition/"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-muted-foreground hover:text-primary transition-colors"
@@ -224,7 +224,7 @@ export function Home() {
                   <Instagram className="h-5 w-5" />
                 </a>
                 <a
-                  href="https://www.tiktok.com/@mutant_cbba.bo"
+                  href="https://www.tiktok.com/@enerfitnutrition?is_from_webapp=1&sender_device=pc"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-muted-foreground hover:text-primary transition-colors"
@@ -306,9 +306,6 @@ export function Home() {
                       CERRADO
                     </span>
                   </div>
-                  <p className="text-sm text-muted-foreground">
-                    Horario especial de fin de semana
-                  </p>
                 </div>
               </div>
             </div>
@@ -318,7 +315,7 @@ export function Home() {
           <div className="border-t border-border mt-12 pt-8">
             <div className="flex flex-col md:flex-row justify-between items-center gap-4">
               <p className="text-muted-foreground text-sm text-center md:text-left">
-                © 2026 ENERFIT. Todos los derechos reservados.
+                © {new Date().getFullYear()} ENERFIT. Todos los derechos reservados.
               </p>
               <div className="flex gap-6 text-sm text-muted-foreground">
                 <a href="#" className="hover:text-foreground transition-colors">
