@@ -29,7 +29,6 @@ export function LoginForm() {
       const user = JSON.parse(userData);
 
       if (user.rol === "admin") {
-        // CAMBIADO: ahora redirige a Control de Ventas
         navigate("/admin/sales", { replace: true });
       } else if (
         ["recepcionista", "entrenador", "limpieza"].includes(user.rol)
@@ -59,14 +58,19 @@ export function LoginForm() {
     try {
       console.log("Intentando login con usuario:", username);
 
-      // Verificar suscripción - esto lanzará error si el backend no responde o hay timeout
+      // Verificar suscripción
       let suscripcionStatus;
       try {
         suscripcionStatus = await checkSuscripcion();
       } catch (suscripcionError: any) {
         console.error("Error al verificar suscripción:", suscripcionError);
 
-        // Verificar si es error de conexión (backend apagado) o timeout
+        // ⭐ NUEVO: primero mostrar el mensaje real del backend si existe
+        const backendMessage =
+          suscripcionError.response?.data?.message ||
+          suscripcionError.response?.data?.error;
+
+        // Detectar error de conexión / timeout
         const isConnectionError =
           suscripcionError.message?.includes("Network Error") ||
           suscripcionError.message?.includes("ERR_CONNECTION_REFUSED") ||
@@ -80,9 +84,7 @@ export function LoginForm() {
           suscripcionError.code === "ERR_NETWORK" ||
           suscripcionError.code === "ETIMEDOUT" ||
           (suscripcionError.name === "AxiosError" &&
-            !suscripcionError.response) ||
-          (suscripcionError.name === "AxiosError" &&
-            suscripcionError.code === "ECONNABORTED");
+            !suscripcionError.response);
 
         if (isConnectionError) {
           console.log(
@@ -92,11 +94,15 @@ export function LoginForm() {
           return;
         }
 
-        // Si es otro tipo de error, lo relanzamos para que lo maneje el catch principal
+        // Si el backend dio un mensaje específico, mostrarlo
+        if (backendMessage) {
+          setError(`Error del servidor: ${backendMessage}`);
+          return;
+        }
+
         throw suscripcionError;
       }
 
-      // Si llegamos aquí, la verificación de suscripción fue exitosa
       console.log("Estado de suscripción:", suscripcionStatus);
 
       // Verificar si la suscripción está pagada
@@ -125,9 +131,7 @@ export function LoginForm() {
             apellidos: user.apellidos,
           });
 
-          // Redirigir según el rol
           if (user.rol === "admin") {
-            // CAMBIADO: ahora redirige a Control de Ventas
             navigate("/admin/sales", { replace: true });
           } else if (
             ["recepcionista", "entrenador", "limpieza"].includes(user.rol)
@@ -148,7 +152,10 @@ export function LoginForm() {
     } catch (err: any) {
       console.error("Error en handleSubmit:", err);
 
-      // Verificar si es error de conexión con el backend o timeout
+      // ⭐ NUEVO: mostrar mensaje del backend si existe
+      const backendMessage =
+        err.response?.data?.message || err.response?.data?.error;
+
       const isConnectionError =
         err.message?.includes("Network Error") ||
         err.message?.includes("ERR_CONNECTION_REFUSED") ||
@@ -161,8 +168,7 @@ export function LoginForm() {
         err.code === "ECONNABORTED" ||
         err.code === "ERR_NETWORK" ||
         err.code === "ETIMEDOUT" ||
-        (err.name === "AxiosError" && !err.response) ||
-        (err.name === "AxiosError" && err.code === "ECONNABORTED");
+        (err.name === "AxiosError" && !err.response);
 
       if (isConnectionError) {
         console.log(
@@ -172,7 +178,11 @@ export function LoginForm() {
         return;
       }
 
-      // Si el error es de suscripción no pagada, redirigir a /faltapago
+      if (backendMessage) {
+        setError(`Error del servidor: ${backendMessage}`);
+        return;
+      }
+
       if (
         err.message?.includes("SUSCRIPCION_NO_PAGADA") ||
         err.message?.includes("Acceso restringido: Suscripción no pagada") ||
@@ -184,7 +194,6 @@ export function LoginForm() {
         return;
       }
 
-      // Para otros errores, mostrar el mensaje
       setError(
         err.message ||
           "Error al iniciar sesión. Por favor, intenta nuevamente.",
@@ -260,7 +269,7 @@ export function LoginForm() {
             </div>
 
             {error && (
-              <div className="p-3 text-sm text-destructive bg-destructive/15 border border-destructive/50 rounded-md animate-pulse">
+              <div className="p-3 text-sm text-destructive bg-destructive/15 border border-destructive/50 rounded-md">
                 <strong>Error:</strong> {error}
               </div>
             )}
