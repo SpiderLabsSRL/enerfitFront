@@ -318,7 +318,7 @@ export function UneteAhora() {
               className="relative text-3xl sm:text-4xl font-black tracking-tight"
             >
               <span className="relative inline-block bg-gradient-to-r from-primary via-primary/90 to-primary bg-clip-text text-transparent drop-shadow-[0_0_20px_rgba(250,204,21,0.5)]">
-                ENERFIT GYM
+                ENERFIT NUTRITION
               </span>
             </motion.h1>
 
