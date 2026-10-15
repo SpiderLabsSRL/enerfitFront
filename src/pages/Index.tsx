@@ -12,7 +12,7 @@ const Index = () => {
       <div className="text-center space-y-8 max-w-4xl">
         {/* Header */}
         <div className="space-y-4">
-          <img src={mutantLogo} alt="MUTANT Gym" className="h-24 mx-auto" />
+          <img src={mutantLogo} alt="ENERFIT" className="h-24 mx-auto" />
           <h1 className="text-6xl font-bold text-primary" style={{color: '#f0d000'}}>MUTANT</h1>
           <p className="text-2xl text-muted-foreground" style={{color: '#b8a000'}}>Sistema de Control de Gimnasio</p>
         </div>
@@ -71,7 +71,7 @@ const Index = () => {
         {/* Footer */}
         <div className="mt-12 pt-8 border-t border-border">
           <p className="text-muted-foreground">
-            © 2024 MUTANT Gym - Sistema de Control Integral
+            © 2026 ENERFIT - Sistema de Control Integral
           </p>
         </div>
       </div>

@@ -238,7 +238,7 @@ export function Tienda() {
   const enviarPedidoWhatsApp = () => {
     if (carrito.length === 0) return;
 
-    let mensaje = "*PEDIDO MUTANT STORE*\n\n";
+    let mensaje = "*PEDIDO ENERFIT STORE*\n\n";
     mensaje += "Hola! Me gustaria realizar el siguiente pedido:\n\n";
     mensaje += "*PRODUCTOS:*\n";
 
@@ -304,7 +304,7 @@ export function Tienda() {
               <ShoppingBag className="h-7 w-7 text-primary" />
             </div>
             <h1 className="text-3xl sm:text-4xl md:text-5xl font-black text-foreground tracking-tight">
-              MUTANT{" "}
+              ENERFIT{" "}
               <span className="bg-gradient-to-r from-primary via-primary/90 to-primary bg-clip-text text-transparent">
                 STORE
               </span>

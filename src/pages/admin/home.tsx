@@ -57,7 +57,7 @@ export function Home() {
               <div>
                 <img
                   src={mutantLogo}
-                  alt="MUTANT Gym"
+                  alt="ENERFIT"
                   className="h-14 mx-auto"
                 />
               </div>
@@ -198,7 +198,7 @@ export function Home() {
                 <div>
                   <img
                     src={mutantLogo}
-                    alt="MUTANT Gym"
+                    alt="ENERFIT"
                     className="h-18 mx-auto"
                   />
                 </div>
@@ -340,7 +340,7 @@ export function Home() {
           <div className="border-t border-border mt-12 pt-8">
             <div className="flex flex-col md:flex-row justify-between items-center gap-4">
               <p className="text-muted-foreground text-sm text-center md:text-left">
-                © 2026 MUTANT GYM. Todos los derechos reservados.
+                © 2026 ENERFIT. Todos los derechos reservados.
               </p>
               <div className="flex gap-6 text-sm text-muted-foreground">
                 <a href="#" className="hover:text-foreground transition-colors">

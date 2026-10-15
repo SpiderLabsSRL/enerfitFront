@@ -102,7 +102,7 @@ export function AccessControl() {
       <div className="w-full max-w-2xl space-y-6">
         {/* Header */}
         <div className="text-center space-y-4">
-          <img src={mutantLogo} alt="MUTANT Gym" className="h-16 mx-auto" />
+          <img src={mutantLogo} alt="ENERFIT" className="h-16 mx-auto" />
           <h1 className="text-4xl font-bold text-primary">SISTEMA DE ACCESO</h1>
           <p className="text-muted-foreground">Coloca tu huella para acceder</p>
         </div>

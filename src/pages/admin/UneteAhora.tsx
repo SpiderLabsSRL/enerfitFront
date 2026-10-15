@@ -318,7 +318,7 @@ export function UneteAhora() {
               className="relative text-3xl sm:text-4xl font-black tracking-tight"
             >
               <span className="relative inline-block bg-gradient-to-r from-primary via-primary/90 to-primary bg-clip-text text-transparent drop-shadow-[0_0_20px_rgba(250,204,21,0.5)]">
-                MUTANT GYM
+                ENERFIT GYM
               </span>
             </motion.h1>
 
@@ -877,7 +877,7 @@ export function UneteAhora() {
                               Sin planes activos
                             </p>
                             <p className="text-foreground text-xs leading-relaxed">
-                              Acércate a recepción de Mutant Gym para adquirir
+                              Acércate a recepción de ENERFIT para adquirir
                               un plan.
                             </p>
                           </div>
@@ -913,7 +913,7 @@ export function UneteAhora() {
                 <UserCheck className="h-8 w-8 text-primary" />
               </div>
               <h3 className="text-lg font-bold mb-1.5 text-foreground">
-                ¡Bienvenido a MUTANT GYM!
+                ¡Bienvenido a ENERFIT!
               </h3>
               <p className="text-muted-foreground text-xs mb-3">
                 Tus datos han sido guardados exitosamente.
