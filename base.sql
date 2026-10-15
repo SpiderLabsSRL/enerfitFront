@@ -63,7 +63,7 @@ CREATE TABLE empleados (
 CREATE TABLE horarios_empleado (
     id SERIAL PRIMARY KEY,
     empleado_id INTEGER NOT NULL,
-    dia_semana SMALLINT NOT NULL CHECK (dia_semana BETWEEN 1 AND 7), -- 1=Lunes, 7=Domingo
+    dia_semana SMALLINT NOT NULL CHECK (dia_semana BETWEEN 1 AND 7),
     hora_ingreso TIME NOT NULL,
     hora_salida TIME NOT NULL,
     sucursal_id INTEGER,
@@ -182,7 +182,6 @@ CREATE TABLE servicio_sucursal (
 
 -- ============================================================
 -- 13. INSCRIPCIONES
---     (incluye estado_inscripcion integrado)
 -- ============================================================
 CREATE TABLE inscripciones (
     id SERIAL PRIMARY KEY,
@@ -194,7 +193,6 @@ CREATE TABLE inscripciones (
     ingresos_disponibles INTEGER DEFAULT NULL,
     -- 0=inactivo, 1=activo, 2=eliminado
     estado SMALLINT DEFAULT 1 CHECK (estado IN (0, 1, 2)),
-    -- activo | inactivo (se calcula según fechas y reglas de reemplazo/futuro)
     estado_inscripcion VARCHAR(10) DEFAULT 'activo'
         CHECK (estado_inscripcion IN ('activo', 'inactivo')),
     FOREIGN KEY (persona_id) REFERENCES personas(id) ON DELETE CASCADE,
@@ -252,6 +250,7 @@ CREATE TABLE movimientos_stock (
 
 -- ============================================================
 -- 17. CUPONES
+--     (incluye empleado_id opcional, ON DELETE SET NULL)
 -- ============================================================
 CREATE TABLE cupones (
     id SERIAL PRIMARY KEY,
@@ -266,7 +265,10 @@ CREATE TABLE cupones (
     aplica_servicios BOOLEAN DEFAULT TRUE,
     aplica_productos BOOLEAN DEFAULT TRUE,
     -- 0=inactivo, 1=activo, 2=eliminado
-    estado SMALLINT DEFAULT 1 CHECK (estado IN (0, 1, 2))
+    estado SMALLINT DEFAULT 1 CHECK (estado IN (0, 1, 2)),
+    -- Empleado al que pertenece el cupón (opcional). NULL = cupón general
+    empleado_id INTEGER NULL,
+    FOREIGN KEY (empleado_id) REFERENCES empleados(id) ON DELETE SET NULL
 );
 
 CREATE TABLE cupon_sucursal (
@@ -367,14 +369,11 @@ CREATE TABLE movimientos_caja (
 
 -- ============================================================
 -- 21. REGISTROS DE ACCESO
---     (incluye inscripcion_id integrado)
 -- ============================================================
 CREATE TABLE registros_acceso (
     id SERIAL PRIMARY KEY,
     persona_id INTEGER NOT NULL,
     servicio_id INTEGER,
-    -- Inscripción específica a la que corresponde el acceso
-    -- (para bloquear doble ingreso por día por inscripción)
     inscripcion_id INTEGER,
     detalle TEXT,
     estado VARCHAR(20) CHECK (estado IN ('exitoso', 'denegado')),
@@ -412,7 +411,7 @@ CREATE TABLE pagos_pendientes (
 CREATE TABLE objetivos_mensuales (
     id SERIAL PRIMARY KEY,
     sucursal_id INTEGER NOT NULL,
-    mes VARCHAR(7) NOT NULL,  -- formato "YYYY-MM"
+    mes VARCHAR(7) NOT NULL,
     objetivo DECIMAL(15, 2) NOT NULL,
     fecha_creacion TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     fecha_actualizacion TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -447,6 +446,7 @@ CREATE TABLE suscripcion (
     id SERIAL PRIMARY KEY,
     pagado BOOLEAN NOT NULL DEFAULT false
 );
+
 -- ============================================================
 -- 26. MOVIMIENTOS DE FECHAS DE INSCRIPCIÓN (auditoría)
 -- ============================================================
@@ -511,6 +511,7 @@ CREATE INDEX idx_movimientos_stock_producto ON movimientos_stock(producto_id, su
 CREATE INDEX idx_cupones_codigo ON cupones(codigo);
 CREATE INDEX idx_cupones_estado ON cupones(estado);
 CREATE INDEX idx_cupones_fechas ON cupones(fecha_inicio, fecha_fin);
+CREATE INDEX idx_cupones_empleado ON cupones(empleado_id);       -- ⭐ NUEVO
 CREATE INDEX idx_cupon_sucursal_cupon ON cupon_sucursal(cupon_id);
 CREATE INDEX idx_cupon_sucursal_sucursal ON cupon_sucursal(sucursal_id);
 CREATE INDEX idx_horarios_servicio_dia ON horarios_servicio(dia_semana);
@@ -528,6 +529,7 @@ CREATE INDEX idx_mov_fechas_insc_inscripcion ON movimientos_fechas_inscripcion(i
 CREATE INDEX idx_mov_fechas_insc_persona ON movimientos_fechas_inscripcion(persona_id);
 CREATE INDEX idx_mov_fechas_insc_usuario ON movimientos_fechas_inscripcion(usuario_id);
 CREATE INDEX idx_mov_fechas_insc_fecha ON movimientos_fechas_inscripcion(fecha DESC);
+
 -- ============================================================
 -- COMENTARIOS
 -- ============================================================
@@ -551,6 +553,7 @@ COMMENT ON COLUMN productos.landing IS 'Si se muestra en la página de inicio';
 COMMENT ON COLUMN producto_sucursal.stock_minimo IS 'Stock mínimo para alertas';
 COMMENT ON COLUMN horarios_empleado.sucursal_id IS 'Sucursal donde el empleado trabaja ese horario. NULL = hereda del empleado';
 COMMENT ON TABLE cupones IS 'Cupones de descuento para servicios y productos';
+COMMENT ON COLUMN cupones.empleado_id IS 'Empleado al que pertenece el cupón. NULL = cupón general.';
 COMMENT ON TABLE cupon_sucursal IS 'Sucursales donde aplica cada cupón';
 COMMENT ON COLUMN cajas.estado_caja IS 'abierta | cerrada';
 COMMENT ON COLUMN cajas.total IS 'Monto actual en la caja';

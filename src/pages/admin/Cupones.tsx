@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+// src/components/Cupones.tsx
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -45,6 +46,8 @@ import {
   Briefcase,
   Plus,
   X,
+  User,
+  UserCircle,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -53,12 +56,14 @@ import { useToast } from "@/hooks/use-toast";
 import {
   getCupones,
   getSucursales,
+  getEmpleadosCupones,
   createCupon,
   updateCupon,
   deleteCupon,
   toggleCuponStatus,
   type Cupon,
   type Sucursal,
+  type Empleado,
   type CuponFormData,
 } from "../../api/CuponesApi";
 
@@ -85,7 +90,7 @@ const generarCodigo = (): string => {
   return codigo;
 };
 
-// ✅ CAMBIO: tipo local que permite "" como "sin selección"
+// ✅ Tipo local que permite "" como "sin selección"
 type TipoDescuentoLocal = "porcentaje" | "monto_fijo" | "";
 
 interface CuponFormDataLocal extends Omit<CuponFormData, "tipo"> {
@@ -96,6 +101,7 @@ export function Cupones() {
   const [loading, setLoading] = useState<boolean>(true);
   const [cupones, setCupones] = useState<Cupon[]>([]);
   const [sucursales, setSucursales] = useState<Sucursal[]>([]);
+  const [empleados, setEmpleados] = useState<Empleado[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editandoCupon, setEditandoCupon] = useState<Cupon | null>(null);
   const [copiado, setCopiado] = useState<string | null>(null);
@@ -103,7 +109,11 @@ export function Cupones() {
     {}
   );
 
-  // ✅ CAMBIO: tipo inicia vacío
+  // ⭐ Estados para el buscador de empleados
+  const [busquedaEmpleado, setBusquedaEmpleado] = useState("");
+  const [mostrarListaEmpleados, setMostrarListaEmpleados] = useState(false);
+
+  // ✅ Tipo inicia vacío, empleadoId inicia null
   const [formData, setFormData] = useState<CuponFormDataLocal>({
     codigo: "",
     tipo: "",
@@ -114,6 +124,7 @@ export function Cupones() {
     usosMaximos: "",
     aplicableA: [],
     sucursalesIds: [],
+    empleadoId: null,
   });
 
   const { toast } = useToast();
@@ -126,12 +137,14 @@ export function Cupones() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [cuponesData, sucursalesData] = await Promise.all([
+      const [cuponesData, sucursalesData, empleadosData] = await Promise.all([
         getCupones(),
         getSucursales(),
+        getEmpleadosCupones(),
       ]);
       setCupones(cuponesData);
       setSucursales(sucursalesData);
+      setEmpleados(empleadosData);
     } catch (error: unknown) {
       toast({
         title: "Error",
@@ -164,6 +177,16 @@ export function Cupones() {
     tipo: (data.tipo || "porcentaje") as "porcentaje" | "monto_fijo",
   });
 
+  // ⭐ Filtro de empleados para el buscador del select
+  const empleadosFiltrados = useMemo(() => {
+    const term = busquedaEmpleado.toLowerCase().trim();
+    if (!term) return empleados;
+    return empleados.filter((emp) => {
+      const texto = `${emp.nombreCompleto} ${emp.rol}`.toLowerCase();
+      return texto.includes(term);
+    });
+  }, [empleados, busquedaEmpleado]);
+
   const handleSubmit = async () => {
     if (!formData.codigo || !formData.valor || !formData.fechaExpiracion) {
       toast({
@@ -174,7 +197,6 @@ export function Cupones() {
       return;
     }
 
-    // ✅ CAMBIO: validar que se haya seleccionado el tipo de descuento
     if (!formData.tipo) {
       toast({
         title: "Datos incompletos",
@@ -242,7 +264,7 @@ export function Cupones() {
   const resetForm = () => {
     setFormData({
       codigo: "",
-      tipo: "", // ✅ CAMBIO
+      tipo: "",
       valor: "",
       descripcion: "",
       fechaInicio: getBoliviaDate(),
@@ -250,6 +272,7 @@ export function Cupones() {
       usosMaximos: "",
       aplicableA: [],
       sucursalesIds: [],
+      empleadoId: null,
     });
   };
 
@@ -257,7 +280,7 @@ export function Cupones() {
     setEditandoCupon(cupon);
     setFormData({
       codigo: cupon.codigo,
-      tipo: cupon.tipo, // al editar sí se mantiene el tipo guardado
+      tipo: cupon.tipo,
       valor: cupon.valor.toString(),
       descripcion: cupon.descripcion,
       fechaInicio: cupon.fechaInicio,
@@ -265,6 +288,7 @@ export function Cupones() {
       usosMaximos: cupon.usosMaximos.toString(),
       aplicableA: cupon.aplicableA,
       sucursalesIds: cupon.sucursalesIds,
+      empleadoId: cupon.empleadoId,
     });
     setDialogOpen(true);
   };
@@ -451,9 +475,25 @@ export function Cupones() {
 
       {/* Botón para agregar cupón */}
       <div className="flex justify-end">
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <Dialog
+          open={dialogOpen}
+          onOpenChange={(open) => {
+            setDialogOpen(open);
+            if (!open) {
+              setBusquedaEmpleado("");
+              setMostrarListaEmpleados(false);
+            }
+          }}
+        >
           <DialogTrigger asChild>
-            <Button className="bg-primary text-primary-foreground hover:bg-primary/90">
+            <Button
+              onClick={() => {
+                resetForm();
+                setBusquedaEmpleado("");
+                setMostrarListaEmpleados(false);
+              }}
+              className="bg-primary text-primary-foreground hover:bg-primary/90"
+            >
               <PlusCircle className="h-4 w-4 mr-2" />
               Nuevo Cupón
             </Button>
@@ -550,7 +590,6 @@ export function Cupones() {
                   <Label>
                     Tipo de Descuento <span className="text-red-500">*</span>
                   </Label>
-                  {/* ✅ CAMBIO: ningún botón seleccionado por defecto */}
                   <div className="flex gap-3">
                     <button
                       type="button"
@@ -787,6 +826,156 @@ export function Cupones() {
               </div>
 
               {/* ============================================ */}
+              {/* SECCIÓN: Empleado asignado (con buscador) */}
+              {/* ============================================ */}
+              <div className="space-y-4 p-3 bg-muted/30 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <UserCircle className="h-4 w-4 text-primary" />
+                  <Label className="text-sm font-semibold">
+                    Empleado asignado (opcional)
+                  </Label>
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="empleado">
+                    ¿A qué empleado pertenece este cupón?
+                  </Label>
+
+                  <div className="relative">
+                    {/* Botón / trigger del select */}
+                    <button
+                      type="button"
+                      id="empleado"
+                      onClick={() => setMostrarListaEmpleados((v) => !v)}
+                      className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                    >
+                      <span className="flex items-center gap-2 truncate">
+                        {formData.empleadoId ? (
+                          <>
+                            <User className="h-4 w-4 text-primary shrink-0" />
+                            <span className="truncate">
+                              {empleados.find(
+                                (e) => e.id === formData.empleadoId
+                              )?.nombreCompleto || "Empleado no encontrado"}
+                            </span>
+                          </>
+                        ) : (
+                          <span className="text-muted-foreground">
+                            — Ninguno (cupón general) —
+                          </span>
+                        )}
+                      </span>
+                      <span className="text-muted-foreground text-xs">▼</span>
+                    </button>
+
+                    {/* Dropdown con buscador */}
+                    {mostrarListaEmpleados && (
+                      <>
+                        {/* Overlay para cerrar al hacer click fuera */}
+                        <div
+                          className="fixed inset-0 z-40"
+                          onClick={() => setMostrarListaEmpleados(false)}
+                        />
+
+                        <div className="absolute z-50 mt-1 w-full rounded-md border border-input bg-popover shadow-lg">
+                          {/* Input de búsqueda */}
+                          <div className="p-2 border-b border-input">
+                            <Input
+                              placeholder="Buscar empleado..."
+                              value={busquedaEmpleado}
+                              onChange={(e) =>
+                                setBusquedaEmpleado(e.target.value)
+                              }
+                              autoFocus
+                              className="h-8 text-sm"
+                            />
+                          </div>
+
+                          {/* Lista de opciones */}
+                          <div className="max-h-56 overflow-y-auto py-1">
+                            {/* Opción "Ninguno" */}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  empleadoId: null,
+                                }));
+                                setMostrarListaEmpleados(false);
+                                setBusquedaEmpleado("");
+                              }}
+                              className={`w-full text-left px-3 py-2 text-sm hover:bg-accent transition-colors ${
+                                formData.empleadoId === null
+                                  ? "bg-accent/50"
+                                  : ""
+                              }`}
+                            >
+                              <span className="text-muted-foreground">
+                                — Ninguno (cupón general) —
+                              </span>
+                            </button>
+
+                            {empleadosFiltrados.length === 0 ? (
+                              <div className="px-3 py-4 text-center text-xs text-muted-foreground">
+                                No se encontraron empleados
+                              </div>
+                            ) : (
+                              empleadosFiltrados.map((emp) => (
+                                <button
+                                  key={emp.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setFormData((prev) => ({
+                                      ...prev,
+                                      empleadoId: emp.id,
+                                    }));
+                                    setMostrarListaEmpleados(false);
+                                    setBusquedaEmpleado("");
+                                  }}
+                                  className={`w-full text-left px-3 py-2 text-sm hover:bg-accent transition-colors flex items-center gap-2 ${
+                                    formData.empleadoId === emp.id
+                                      ? "bg-accent/50"
+                                      : ""
+                                  }`}
+                                >
+                                  <User className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                                  <span className="flex-1 truncate">
+                                    {emp.nombreCompleto}
+                                  </span>
+                                  <span className="text-xs text-muted-foreground capitalize shrink-0">
+                                    {emp.rol}
+                                  </span>
+                                </button>
+                              ))
+                            )}
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  <p className="text-xs text-muted-foreground">
+                    Si no seleccionas un empleado, el cupón será de uso general.
+                  </p>
+                </div>
+
+                {formData.empleadoId && (
+                  <div className="flex items-center gap-2 p-2 bg-primary/5 rounded-md border border-primary/20">
+                    <User className="h-4 w-4 text-primary" />
+                    <span className="text-sm">
+                      Asignado a:{" "}
+                      <strong>
+                        {
+                          empleados.find((e) => e.id === formData.empleadoId)
+                            ?.nombreCompleto
+                        }
+                      </strong>
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* ============================================ */}
               {/* SECCIÓN: Sucursales */}
               {/* ============================================ */}
               <div className="space-y-4 p-3 bg-muted/30 rounded-lg">
@@ -932,6 +1121,7 @@ export function Cupones() {
                   <TableHead>Vigencia</TableHead>
                   <TableHead>Usos</TableHead>
                   <TableHead>Aplica a</TableHead>
+                  <TableHead>Empleado</TableHead>
                   <TableHead>Sucursales</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead className="text-right">Acciones</TableHead>
@@ -1007,6 +1197,24 @@ export function Cupones() {
                         )}
                       </div>
                     </TableCell>
+
+                    {/* ⭐ Columna Empleado */}
+                    <TableCell>
+                      {cupon.empleadoId ? (
+                        <Badge
+                          variant="outline"
+                          className="text-xs border-primary/40 text-primary"
+                        >
+                          <User className="h-3 w-3 mr-1" />
+                          {cupon.empleadoNombre}
+                        </Badge>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">
+                          General
+                        </span>
+                      )}
+                    </TableCell>
+
                     <TableCell className="max-w-[200px]">
                       <div className="text-xs text-muted-foreground truncate">
                         {getSucursalesNombres(cupon.sucursalesIds) || "—"}

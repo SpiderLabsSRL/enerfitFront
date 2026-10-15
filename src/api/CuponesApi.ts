@@ -1,3 +1,4 @@
+// src/api/CuponesApi.ts
 import axios from "axios";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
@@ -9,6 +10,14 @@ export interface Sucursal {
   id: string;
   nombre: string;
   direccion: string;
+}
+
+export interface Empleado {
+  id: string;
+  rol: string;
+  nombres: string;
+  apellidos: string;
+  nombreCompleto: string;
 }
 
 export interface Cupon {
@@ -24,6 +33,10 @@ export interface Cupon {
   activo: boolean;
   aplicableA: ("servicios" | "productos")[];
   sucursalesIds: string[];
+  // ⭐ NUEVOS CAMPOS
+  empleadoId: string | null;
+  empleadoNombre: string | null;
+  empleadoRol: string | null;
 }
 
 export interface CuponFormData {
@@ -36,6 +49,7 @@ export interface CuponFormData {
   usosMaximos: string;
   aplicableA: ("servicios" | "productos")[];
   sucursalesIds: string[];
+  empleadoId: string | null; // ⭐ NUEVO
 }
 
 // ============================================
@@ -44,9 +58,7 @@ export interface CuponFormData {
 const api = axios.create({
   baseURL: `${API_URL}/cupones`,
   withCredentials: true,
-  headers: {
-    "Content-Type": "application/json",
-  },
+  headers: { "Content-Type": "application/json" },
 });
 
 // ============================================
@@ -76,6 +88,19 @@ export const getSucursales = async (): Promise<Sucursal[]> => {
 };
 
 // ============================================
+// GET EMPLEADOS (nuevo)
+// ============================================
+export const getEmpleadosCupones = async (): Promise<Empleado[]> => {
+  try {
+    const response = await api.get<Empleado[]>("/empleados");
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching empleados:", error);
+    throw new Error("No se pudieron cargar los empleados");
+  }
+};
+
+// ============================================
 // CREATE CUPON
 // ============================================
 export const createCupon = async (
@@ -95,6 +120,7 @@ export const createCupon = async (
           ? cuponData.aplicableA
           : ["servicios", "productos"],
       sucursalesIds: cuponData.sucursalesIds,
+      empleadoId: cuponData.empleadoId || null, // ⭐ NUEVO
     };
 
     const response = await api.post<Cupon>("/", dataToSend);
@@ -131,6 +157,7 @@ export const updateCupon = async (
           ? cuponData.aplicableA
           : ["servicios", "productos"],
       sucursalesIds: cuponData.sucursalesIds,
+      empleadoId: cuponData.empleadoId || null, // ⭐ NUEVO
     };
 
     const response = await api.put<Cupon>(`/${id}`, dataToSend);
@@ -180,4 +207,4 @@ export const toggleCuponStatus = async (id: string): Promise<Cupon> => {
     }
     throw new Error("No se pudo cambiar el estado del cupón");
   }
-};  
+};
