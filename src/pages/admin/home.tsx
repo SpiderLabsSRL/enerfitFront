@@ -258,36 +258,15 @@ export function Home() {
                 <div className="flex gap-3">
                   <MapPin className="h-5 w-5 text-primary flex-shrink-0 mt-1" />
                   <div>
-                    <p className="font-medium text-foreground mb-1">MUTANT BUNKER</p>
+                    <p className="font-medium text-foreground mb-1">ENERFIT NUTRITION</p>
                     <p className="text-sm">
-                      Av. San Martin entre Sucre y Bolivar, Cochabamba - Bolivia
-                    </p>
-                  </div>
-                </div>
-                <div className="flex gap-3">
-                  <MapPin className="h-5 w-5 text-primary flex-shrink-0 mt-1" />
-                  <div>
-                    <p className="font-medium text-foreground mb-1">MUTANT ARSENAL</p>
-                    <p className="text-sm">
-                      Av. Heroinas entre Av. Ayacucho y C. Nataniel Aguirre,
-                      Cochabamba - Bolivia
+                      Av. Simón López 275, Salon de Eventos 'La Riviera frente a la Corte Electoral, Cochabamba, Bolivia
                     </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
                   <Phone className="h-5 w-5 text-primary" />
-                  <span className="font-medium">76989991</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Globe className="h-5 w-5 text-primary" />
-                  <a
-                    href="https://mutantgym.netlify.app"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="hover:text-primary transition-colors"
-                  >
-                    https://mutantgym.netlify.app
-                  </a>
+                  <span className="font-medium">76970088</span>
                 </div>
               </div>
             </div>
@@ -303,7 +282,7 @@ export function Home() {
                   <div className="flex justify-between items-center mb-2">
                     <span className="text-foreground">Lunes - Viernes</span>
                     <span className="font-bold text-primary">
-                      6:00 AM - 10:00 PM
+                      6:30 AM - 10:00 PM
                     </span>
                   </div>
                   <p className="text-sm text-muted-foreground">
@@ -314,7 +293,7 @@ export function Home() {
                   <div className="flex justify-between items-center mb-2">
                     <span className="text-foreground">Sábados</span>
                     <span className="font-bold text-primary">
-                      8:00 AM - 3:00 PM
+                      7:30 AM - 1:00 PM
                     </span>
                   </div>
                   <p className="text-sm text-muted-foreground">
@@ -325,7 +304,7 @@ export function Home() {
                   <div className="flex justify-between items-center mb-2">
                     <span className="text-foreground">Domingos</span>
                     <span className="font-bold text-primary">
-                      8:00 AM - 3:00 PM
+                      CERRADO
                     </span>
                   </div>
                   <p className="text-sm text-muted-foreground">

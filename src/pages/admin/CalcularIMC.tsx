@@ -110,7 +110,7 @@ export function CalcularIMC() {
     if (imc !== null) imcTexto = imc.toString();
 
     const mensaje = encodeURIComponent(
-      `Hola, me gustaría recibir asesoría para un plan nutricional personalizado para mi proceso en el gimnasio Mutant.\n\n` +
+      `Hola, me gustaría recibir asesoría para un plan nutricional personalizado para mi proceso en el gimnasio ENERFIT.\n\n` +
         `Mis datos actuales son:\n` +
         `• Peso: ${peso} kg\n` +
         `• Altura: ${altura} cm\n` +
@@ -118,7 +118,7 @@ export function CalcularIMC() {
         `${categoria ? `• Categoría: ${categoria}\n` : ""}\n` +
         `Quedo atento a su respuesta. ¡Gracias!`
     );
-    window.open(`https://wa.me/+59176989991?text=${mensaje}`, "_blank");
+    window.open(`https://wa.me/+59176970088?text=${mensaje}`, "_blank");
   };
 
   // Calcular IMC
