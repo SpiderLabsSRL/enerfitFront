@@ -204,8 +204,7 @@ export function Home() {
                 </div>
               </div>
               <p className="text-muted-foreground mb-6">
-                Transformando vidas a través del fitness desde 2010. Tu camino
-                hacia una vida más saludable y fuerte comienza aquí.
+                "Transformando vidas a través del fitness. Tu camino hacia una vida más saludable y fuerte comienza aquí."
               </p>
               <div className="flex gap-4">
                 <a
