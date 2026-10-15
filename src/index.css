@@ -1,0 +1,345 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================ */
+/* MUTANT Gym Design System - Black & Matte Yellow Theme */
+/* ============================================ */
+
+@layer base {
+  :root {
+    --background: 0 0% 5%;
+    --foreground: 48 100% 90%;
+    --card: 0 0% 10%;
+    --card-foreground: 48 100% 90%;
+    --popover: 0 0% 8%;
+    --popover-foreground: 48 100% 90%;
+    --primary: 48 100% 65%;
+    --primary-foreground: 0 0% 5%;
+    --secondary: 0 0% 15%;
+    --secondary-foreground: 48 100% 90%;
+    --muted: 0 0% 20%;
+    --muted-foreground: 48 60% 70%;
+    --accent: 48 100% 65%;
+    --accent-foreground: 0 0% 5%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 48 100% 90%;
+    --success: 120 50% 50%;
+    --success-foreground: 48 100% 90%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 5%;
+    --border: 0 0% 25%;
+    --input: 0 0% 12%;
+    --ring: 48 100% 65%;
+    --radius: 0.75rem;
+    --gradient-primary: linear-gradient(135deg, hsl(48 100% 65%), hsl(48 100% 50%));
+    --gradient-dark: linear-gradient(135deg, hsl(0 0% 5%), hsl(0 0% 10%));
+    --gradient-accent: linear-gradient(90deg, hsl(48 100% 65% / 0.1), hsl(48 100% 65% / 0.05));
+    --shadow-glow: 0 0 20px hsl(48 100% 65% / 0.3);
+    --shadow-card: 0 4px 20px hsl(0 0% 0% / 0.4);
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --sidebar-background: 0 0% 5%;
+    --sidebar-foreground: 48 100% 90%;
+    --sidebar-primary: 48 100% 65%;
+    --sidebar-primary-foreground: 0 0% 5%;
+    --sidebar-accent: 0 0% 15%;
+    --sidebar-accent-foreground: 48 100% 90%;
+    --sidebar-border: 0 0% 25%;
+    --sidebar-ring: 48 100% 65%;
+  }
+}
+
+@layer components {
+  .gym-card {
+    @apply bg-card border border-border rounded-lg p-6 shadow-[var(--shadow-card)];
+  }
+  .gym-gradient {
+    background: var(--gradient-primary);
+  }
+  .gym-glow {
+    box-shadow: var(--shadow-glow);
+  }
+  .gym-transition {
+    transition: var(--transition-smooth);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* ============================================ */
+/* ESTILOS PARA TODOS LOS INPUTS EN GENERAL */
+/* ============================================ */
+
+input,
+textarea,
+select {
+  background-color: hsl(0 0% 12%) !important;
+  border-color: hsl(0 0% 25%) !important;
+  color: hsl(48 100% 90%) !important;
+}
+
+input:hover,
+textarea:hover,
+select:hover {
+  border-color: hsl(48 100% 65%) !important;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  border-color: hsl(48 100% 65%) !important;
+  outline: none !important;
+  box-shadow: 0 0 0 2px hsl(48 100% 65% / 0.3) !important;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: hsl(48 60% 70%) !important;
+  opacity: 0.7 !important;
+}
+
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 100px hsl(0 0% 12%) inset !important;
+  -webkit-text-fill-color: hsl(48 100% 90%) !important;
+  caret-color: hsl(48 100% 90%) !important;
+  transition: background-color 5000s ease-in-out 0s !important;
+}
+
+/* ============================================ */
+/* ESTILOS PARA INPUT TYPE="number" */
+/* ============================================ */
+
+input[type="number"] {
+  background-color: hsl(0 0% 12%) !important;
+  border-color: hsl(0 0% 25%) !important;
+  color: hsl(48 100% 90%) !important;
+  -moz-appearance: textfield !important;
+  appearance: textfield !important;
+}
+
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none !important;
+  margin: 0 !important;
+  display: none !important;
+}
+
+input[type="number"]:focus {
+  border-color: hsl(48 100% 65%) !important;
+  outline: none !important;
+  box-shadow: 0 0 0 2px hsl(48 100% 65% / 0.3) !important;
+}
+
+/* ============================================ */
+/* ESTILOS PARA INPUT TYPE="time" Y SU POPUP */
+/* ============================================ */
+
+input[type="time"] {
+  color-scheme: dark !important;
+  background-color: hsl(0 0% 12%) !important;
+  border-color: hsl(0 0% 25%) !important;
+  color: hsl(48 100% 90%) !important;
+}
+
+/* Ícono del reloj en AMARILLO MATE (no fluorescente) */
+input[type="time"]::-webkit-calendar-picker-indicator {
+  filter: brightness(0) saturate(100%) invert(81%) sepia(81%) saturate(1850%) hue-rotate(358deg) brightness(103%) contrast(101%) !important;
+  cursor: pointer !important;
+  opacity: 1 !important;
+}
+
+input[type="time"]::-webkit-calendar-picker-indicator:hover {
+  filter: brightness(0) saturate(100%) invert(89%) sepia(55%) saturate(1000%) hue-rotate(359deg) brightness(105%) contrast(95%) !important;
+  transform: scale(1.05);
+}
+
+/* ============================================ */
+/* ESTILOS PARA EL POPUP DEL INPUT TIME */
+/* ============================================ */
+
+/* El contenedor principal del popup de hora */
+::-webkit-datetime-edit-fields-wrapper,
+::-webkit-datetime-edit-text,
+::-webkit-datetime-edit-hour-field,
+::-webkit-datetime-edit-minute-field,
+::-webkit-datetime-edit-ampm-field {
+  color: hsl(48 100% 90%) !important;
+  background-color: transparent !important;
+}
+
+/* El popup que aparece al hacer clic (selector de hora) */
+input[type="time"]::-webkit-calendar-picker-indicator:focus + ::-webkit-datetime-edit,
+input[type="time"]:focus::-webkit-calendar-picker-indicator {
+  outline: none;
+}
+
+/* Forzar el tema oscuro del popup nativo */
+input[type="time"] {
+  background-color: hsl(0 0% 12%) !important;
+}
+
+/* No podemos modificar directamente el popup de hora del navegador,
+   pero podemos aplicar estilos globales para inputs time */
+@media (prefers-color-scheme: dark) {
+  input[type="time"] {
+    color-scheme: dark;
+  }
+}
+
+/* ============================================ */
+/* ESTILOS PARA EL SELECTOR DE HORA (POPUP) - Chrome/Edge */
+/* ============================================ */
+
+/* El popup completo del time picker */
+input[type="time"]::-webkit-calendar-picker-indicator {
+  position: relative;
+}
+
+/* Para navegadores basados en Chromium, el popup de hora tiene estas clases internas */
+/* Esto cambia el fondo del popup */
+input[type="time"] {
+  -webkit-appearance: none;
+}
+
+/* ============================================ */
+/* OPCIONAL: Usar un selector de hora personalizado */
+/* Si el popup nativo sigue dando problemas, puedes forzar un picker personalizado */
+/* ============================================ */
+
+input[type="time"] {
+  position: relative;
+}
+
+/* ============================================ */
+/* ESTILOS PARA INPUT TYPE="date" Y OTROS */
+/* ============================================ */
+
+input[type="date"],
+input[type="datetime-local"],
+input[type="month"],
+input[type="week"] {
+  color-scheme: dark !important;
+  background-color: hsl(0 0% 12%) !important;
+  border-color: hsl(0 0% 25%) !important;
+  color: hsl(48 100% 90%) !important;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="datetime-local"]::-webkit-calendar-picker-indicator,
+input[type="month"]::-webkit-calendar-picker-indicator,
+input[type="week"]::-webkit-calendar-picker-indicator {
+  filter: brightness(0) saturate(100%) invert(81%) sepia(81%) saturate(1850%) hue-rotate(358deg) brightness(103%) contrast(101%) !important;
+  cursor: pointer !important;
+  opacity: 1 !important;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator:hover,
+input[type="datetime-local"]::-webkit-calendar-picker-indicator:hover,
+input[type="month"]::-webkit-calendar-picker-indicator:hover,
+input[type="week"]::-webkit-calendar-picker-indicator:hover {
+  filter: brightness(0) saturate(100%) invert(89%) sepia(55%) saturate(1000%) hue-rotate(359deg) brightness(105%) contrast(95%) !important;
+  transform: scale(1.05);
+}
+
+input[type="date"]:focus,
+input[type="datetime-local"]:focus,
+input[type="month"]:focus,
+input[type="week"]:focus {
+  border-color: hsl(48 100% 65%) !important;
+  outline: none !important;
+  box-shadow: 0 0 0 2px hsl(48 100% 65% / 0.3) !important;
+}
+
+/* ============================================ */
+/* ESTILOS PARA SELECT (combobox) */
+/* ============================================ */
+
+select {
+  background-color: hsl(0 0% 12%) !important;
+  border-color: hsl(0 0% 25%) !important;
+  color: hsl(48 100% 90%) !important;
+  cursor: pointer;
+}
+
+select option {
+  background-color: hsl(0 0% 12%) !important;
+  color: hsl(48 100% 90%) !important;
+}
+
+select option:hover,
+select option:focus,
+select option:active,
+select option:checked {
+  background-color: hsl(48 100% 65%) !important;
+  color: hsl(0 0% 5%) !important;
+}
+
+select:focus {
+  border-color: hsl(48 100% 65%) !important;
+  outline: none !important;
+  box-shadow: 0 0 0 2px hsl(48 100% 65% / 0.3) !important;
+}
+
+/* ============================================ */
+/* ESTILOS PARA INPUT DISABLED */
+/* ============================================ */
+
+input:disabled,
+textarea:disabled,
+select:disabled {
+  opacity: 0.5 !important;
+  cursor: not-allowed !important;
+}
+
+/* ============================================ */
+/* ESTILOS PARA INPUT CON ERROR */
+/* ============================================ */
+
+input[aria-invalid="true"],
+input.error {
+  border-color: hsl(0 84% 60%) !important;
+}
+
+input[aria-invalid="true"]:focus,
+input.error:focus {
+  border-color: hsl(0 84% 60%) !important;
+  box-shadow: 0 0 0 2px hsl(0 84% 60% / 0.3) !important;
+}
+
+/* ============================================ */
+/* ESTILOS PARA SCROLLBAR PERSONALIZADO */
+/* ============================================ */
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: hsl(0 0% 10%);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(48 100% 65% / 0.5);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(48 100% 65%);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(48 100% 65% / 0.5) hsl(0 0% 10%);
+}

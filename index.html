@@ -1,0 +1,385 @@
+<html lang="es-BO">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- ==================== SEO META TAGS ==================== -->
+    <title>Mutant Gym Cochabamba</title>
+    <meta name="description" content="Mutant Gym Cochabamba - Gym Cochabamba" />
+    <meta
+      name="keywords"
+      content="gym, gimnasio, gimnasio cochabamba, mutant gym, mutant, fitness cochabamba, entrenamiento, pesas, musculación, crossfit, gym cochabamba, entrenador personal, gym cerca de mi"
+    />
+    <meta name="author" content="Mutant Gym Cochabamba" />
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:title" content="Mutant Gym Cochabamba" />
+    <meta
+      property="og:description"
+      content="Transforma tu cuerpo en el gimnasio más completo de Cochabamba. Equipos profesionales, entrenadores certificados y ambiente único."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://mutantgym.netlify.app/" />
+    <meta
+      property="og:image"
+      content="https://mutantgym.netlify.app/images/mutant-gym-cochabamba.jpg"
+    />
+    <meta property="og:locale" content="es_BO" />
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta
+      name="twitter:title"
+      content="Mutant Gym Cochabamba - El Mejor Gimnasio Premium"
+    />
+    <meta
+      name="twitter:description"
+      content="Transforma tu cuerpo en el gimnasio más completo de Cochabamba"
+    />
+    <meta
+      name="twitter:image"
+      content="https://mutantgym.netlify.app/images/mutant-gym-twitter.jpg"
+    />
+
+    <!-- Schema.org markup para Google -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SportsActivityLocation",
+        "name": "Mutant Gym Cochabamba",
+        "description": "Gimnasio premium en Cochabamba con equipos profesionales y entrenadores certificados",
+        "url": "https://mutantgym.netlify.app/",
+        "address": {
+          "@type": "PostalAddress",
+          "addressLocality": "Cochabamba",
+          "addressRegion": "Cochabamba",
+          "addressCountry": "BO"
+        },
+        "priceRange": "$$",
+        "telephone": "+591-XXX-XXX-XXX",
+        "openingHours": "Mo-Fr 05:00-23:00, Sa 06:00-22:00, Su 07:00-21:00",
+        "image": "https://mutantgym.netlify.app/images/mutant-gym-logo.jpg",
+        "sameAs": [
+          "https://www.facebook.com/mutantgymcochabamba",
+          "https://www.instagram.com/mutantgymcochabamba"
+        ]
+      }
+    </script>
+
+    <!-- Local Business Schema -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "HealthAndBeautyBusiness",
+        "name": "Mutant Gym",
+        "image": "https://mutantgym.netlify.app/images/logo.jpg",
+        "@id": "https://mutantgym.netlify.app",
+        "url": "https://mutantgym.netlify.app",
+        "telephone": "+591-XXX-XXX-XXX",
+        "address": {
+          "@type": "PostalAddress",
+          "streetAddress": "Calle [Tu Calle]",
+          "addressLocality": "Cochabamba",
+          "postalCode": "0000",
+          "addressCountry": "BO"
+        },
+        "geo": {
+          "@type": "GeoCoordinates",
+          "latitude": -17.3935,
+          "longitude": -66.157
+        },
+        "openingHoursSpecification": {
+          "@type": "OpeningHoursSpecification",
+          "dayOfWeek": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
+          "opens": "05:00",
+          "closes": "23:00"
+        },
+        "sameAs": [
+          "https://www.facebook.com/mutantgymcochabamba",
+          "https://www.instagram.com/mutantgymcochabamba"
+        ]
+      }
+    </script>
+
+    <!-- Meta tags para prevenir traducción automática -->
+    <meta name="google" content="notranslate" />
+    <meta
+      name="robots"
+      content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1"
+    />
+    <meta name="googlebot" content="index, follow" />
+    <meta name="bingbot" content="index, follow" />
+
+    <!-- Canonical URL -->
+    <link rel="canonical" href="https://mutantgym.netlify.app/" />
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="shortcut icon" href="/favicon.ico" />
+
+    <!-- Preconnect para mejor performance -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
+    <title>Mutant Gym Cochabamba</title>
+
+    <style>
+      /* Estilos básicos mientras carga la aplicación React */
+      body {
+        margin: 0;
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen",
+          "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue",
+          sans-serif;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        background-color: #0a0a0a;
+        color: #f0f0f0;
+        overflow-x: hidden;
+      }
+
+      #root {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .loading {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+        text-align: center;
+        padding: 20px;
+      }
+
+      .spinner {
+        width: 50px;
+        height: 50px;
+        border: 5px solid rgba(255, 255, 255, 0.1);
+        border-top-color: #ff0000;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin-bottom: 20px;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      .logo {
+        font-weight: bold;
+        background: linear-gradient(45deg, #ff0000, #ff6b00);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+        font-size: 3rem;
+        margin-bottom: 20px;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+      }
+
+      .seo-content {
+        position: absolute;
+        opacity: 0;
+        height: 0;
+        overflow: hidden;
+      }
+
+      .seo-content h1 {
+        color: #ff0000;
+        font-size: 2.5rem;
+        margin-bottom: 10px;
+      }
+
+      .seo-content p {
+        font-size: 1.1rem;
+        line-height: 1.6;
+        margin-bottom: 15px;
+      }
+
+      .seo-content strong {
+        color: #ff6b00;
+      }
+
+      /* Estilos para móviles */
+      @media (max-width: 768px) {
+        .logo {
+          font-size: 2.5rem;
+        }
+      }
+    </style>
+  </head>
+
+  <body translate="no">
+    <!-- Contenido SEO oculto pero accesible para motores de búsqueda -->
+    <div class="seo-content" aria-hidden="true">
+      <h1>Mutant Gym Cochabamba</h1>
+      <p>
+        Bienvenido a <strong>Mutant Gym Cochabamba</strong>, el gimnasio más
+        completo y moderno de la ciudad. Ofrecemos instalaciones de primera
+        clase, equipos profesionales y entrenadores certificados para ayudarte a
+        alcanzar tus objetivos fitness.
+      </p>
+
+      <h2>Gimnasio en Cochabamba con Equipos de Última Generación</h2>
+      <p>
+        En <strong>Mutant Gym</strong> encontrarás todo lo necesario para tu
+        transformación física: área de musculación con máquinas Hammer Strength,
+        zona de peso libre, sala de cardio con equipos Life Fitness, área de
+        crossfit y clases grupales.
+      </p>
+
+      <h3>¿Por qué elegir Mutant Gym Cochabamba?</h3>
+      <p>
+        1. <strong>Equipos profesionales</strong> - Tecnología de punta para
+        entrenamiento efectivo
+      </p>
+      <p>
+        2. <strong>Entrenadores certificados</strong> - Asesoramiento
+        personalizado y seguimiento
+      </p>
+      <p>
+        3. <strong>Ambiente motivador</strong> - Comunidad fitness que te
+        impulsa a superarte
+      </p>
+      <p>
+        4. <strong>Horarios flexibles</strong> - Abrimos de 5:00 AM a 11:00 PM
+        de lunes a viernes
+      </p>
+      <p>
+        5. <strong>Precios competitivos</strong> - Membresías adaptadas a tus
+        necesidades
+      </p>
+
+      <h2>Encuentranos en Cochabamba</h2>
+      <p>
+        Mutant Gym está estratégicamente ubicado en Cochabamba para tu
+        conveniencia. Somos el <strong>gimnasio de referencia</strong> para
+        quienes buscan resultados reales en fitness y salud.
+      </p>
+
+      <h3>Servicios del Gimnasio:</h3>
+      <p>- Entrenamiento personalizado</p>
+      <p>- Clases de spinning, zumba y functional training</p>
+      <p>- Área de crossfit y TRX</p>
+      <p>- Asesoramiento nutricional</p>
+      <p>- Vestuarios con lockers y duchas</p>
+
+      <p>
+        Visítanos hoy mismo y descubre por qué somos considerados el
+        <strong>mejor gym de Cochabamba</strong>. ¡Tu transformación comienza en
+        Mutant Gym!
+      </p>
+
+      <p>
+        <strong>Palabras clave relacionadas:</strong> gym cochabamba, gimnasio
+        cochabamba, mutant gym, mutant, fitness cochabamba, entrenamiento
+        personal cochabamba, gimnasio cerca de mi, gym con entrenador, crossfit
+        cochabamba, musculación cochabamba.
+      </p>
+    </div>
+
+    <!-- El atributo translate="no" evita la traducción automática -->
+    <div id="root">
+      <!-- Contenido de carga mientras se carga la aplicación React -->
+      <div class="loading">
+        <div class="spinner"></div>
+        <div class="logo">MUTANT GYM COCHABAMBA</div>
+        <h1>Loading SpiderLabs Application...</h1>
+        <p>Please wait while the application loads.</p>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.tsx"></script>
+
+    <script>
+      // Script adicional para prevenir traducciones dinámicas
+      document.addEventListener("DOMContentLoaded", function () {
+        // Asegurar que el atributo translate se mantenga en 'no'
+        document.body.setAttribute("translate", "no");
+        document.documentElement.setAttribute("translate", "no");
+        document.documentElement.setAttribute("lang", "es-BO");
+
+        // Prevenir el menú contextual de traducción en algunos navegadores
+        document.addEventListener("contextmenu", function (e) {
+          // No hacer nada específico, solo asegurar que el contexto no sea de traducción
+        });
+
+        // Eliminar cualquier clase de traducción que pueda agregar el navegador
+        setInterval(function () {
+          document.body.classList.remove("translated-ltr", "translated-rtl");
+          document.documentElement.classList.remove(
+            "translated-ltr",
+            "translated-rtl",
+          );
+        }, 1000);
+      });
+
+      // Evitar que extensiones de traducción detecten el contenido
+      Object.defineProperty(window, "TRANS", {
+        value: null,
+        writable: false,
+        configurable: false,
+      });
+
+      // Script para mejorar SEO dinámico
+      window.addEventListener("load", function () {
+        // Actualizar título dinámicamente si es necesario
+        document.title = "Mutant Gym Cochabamba";
+
+        // Crear meta description dinámica
+        var metaDesc = document.querySelector('meta[name="description"]');
+        if (metaDesc) {
+          metaDesc.content =
+            "Mutant Gym Cochabamba - Gimnasio premium con los mejores equipos, entrenadores certificados y programas personalizados. ¡Tu transformación comienza aquí!";
+        }
+      });
+    </script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag() {
+        dataLayer.push(arguments);
+      }
+      gtag("js", new Date());
+      gtag("config", "GA_MEASUREMENT_ID");
+    </script>
+
+    <!-- Structured Data adicional para búsquedas locales -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "¿Dónde está ubicado Mutant Gym?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Mutant Gym está ubicado en Cochabamba, Bolivia. Ofrecemos instalaciones modernas y equipos profesionales para tu entrenamiento."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "¿Qué horarios tiene el gimnasio?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Abrimos de lunes a viernes de 5:00 AM a 11:00 PM, sábados de 6:00 AM a 10:00 PM y domingos de 7:00 AM a 9:00 PM."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "¿Ofrecen entrenamiento personalizado?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Sí, contamos con entrenadores certificados que ofrecen planes personalizados según tus objetivos fitness."
+            }
+          }
+        ]
+      }
+    </script>
+  </body>
+</html>
