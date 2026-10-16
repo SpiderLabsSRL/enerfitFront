@@ -4,48 +4,49 @@
 
 /* ============================================ */
 /* ENERFIT Design System - Black & Matte Yellow Theme */
+/* Amarillo principal: #F7B800 → hsl(44, 100%, 48%) */
 /* ============================================ */
 
 @layer base {
   :root {
     --background: 0 0% 5%;
-    --foreground: 48 100% 90%;
+    --foreground: 44 100% 90%;
     --card: 0 0% 10%;
-    --card-foreground: 48 100% 90%;
+    --card-foreground: 44 100% 90%;
     --popover: 0 0% 8%;
-    --popover-foreground: 48 100% 90%;
-    --primary: 48 100% 65%;
+    --popover-foreground: 44 100% 90%;
+    --primary: 44 100% 48%;
     --primary-foreground: 0 0% 5%;
     --secondary: 0 0% 15%;
-    --secondary-foreground: 48 100% 90%;
+    --secondary-foreground: 44 100% 90%;
     --muted: 0 0% 20%;
-    --muted-foreground: 48 60% 70%;
-    --accent: 48 100% 65%;
+    --muted-foreground: 44 60% 70%;
+    --accent: 44 100% 48%;
     --accent-foreground: 0 0% 5%;
     --destructive: 0 84% 60%;
-    --destructive-foreground: 48 100% 90%;
+    --destructive-foreground: 44 100% 90%;
     --success: 120 50% 50%;
-    --success-foreground: 48 100% 90%;
+    --success-foreground: 44 100% 90%;
     --warning: 38 92% 50%;
     --warning-foreground: 0 0% 5%;
     --border: 0 0% 25%;
     --input: 0 0% 12%;
-    --ring: 48 100% 65%;
+    --ring: 44 100% 48%;
     --radius: 0.75rem;
-    --gradient-primary: linear-gradient(135deg, hsl(48 100% 65%), hsl(48 100% 50%));
+    --gradient-primary: linear-gradient(135deg, hsl(44 100% 48%), hsl(44 100% 40%));
     --gradient-dark: linear-gradient(135deg, hsl(0 0% 5%), hsl(0 0% 10%));
-    --gradient-accent: linear-gradient(90deg, hsl(48 100% 65% / 0.1), hsl(48 100% 65% / 0.05));
-    --shadow-glow: 0 0 20px hsl(48 100% 65% / 0.3);
+    --gradient-accent: linear-gradient(90deg, hsl(44 100% 48% / 0.1), hsl(44 100% 48% / 0.05));
+    --shadow-glow: 0 0 20px hsl(44 100% 48% / 0.3);
     --shadow-card: 0 4px 20px hsl(0 0% 0% / 0.4);
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     --sidebar-background: 0 0% 5%;
-    --sidebar-foreground: 48 100% 90%;
-    --sidebar-primary: 48 100% 65%;
+    --sidebar-foreground: 44 100% 90%;
+    --sidebar-primary: 44 100% 48%;
     --sidebar-primary-foreground: 0 0% 5%;
     --sidebar-accent: 0 0% 15%;
-    --sidebar-accent-foreground: 48 100% 90%;
+    --sidebar-accent-foreground: 44 100% 90%;
     --sidebar-border: 0 0% 25%;
-    --sidebar-ring: 48 100% 65%;
+    --sidebar-ring: 44 100% 48%;
   }
 }
 
@@ -82,26 +83,26 @@ textarea,
 select {
   background-color: hsl(0 0% 12%) !important;
   border-color: hsl(0 0% 25%) !important;
-  color: hsl(48 100% 90%) !important;
+  color: hsl(44 100% 90%) !important;
 }
 
 input:hover,
 textarea:hover,
 select:hover {
-  border-color: hsl(48 100% 65%) !important;
+  border-color: hsl(44 100% 48%) !important;
 }
 
 input:focus,
 textarea:focus,
 select:focus {
-  border-color: hsl(48 100% 65%) !important;
+  border-color: hsl(44 100% 48%) !important;
   outline: none !important;
-  box-shadow: 0 0 0 2px hsl(48 100% 65% / 0.3) !important;
+  box-shadow: 0 0 0 2px hsl(44 100% 48% / 0.3) !important;
 }
 
 input::placeholder,
 textarea::placeholder {
-  color: hsl(48 60% 70%) !important;
+  color: hsl(44 60% 70%) !important;
   opacity: 0.7 !important;
 }
 
@@ -110,8 +111,8 @@ input:-webkit-autofill:hover,
 input:-webkit-autofill:focus,
 input:-webkit-autofill:active {
   -webkit-box-shadow: 0 0 0 100px hsl(0 0% 12%) inset !important;
-  -webkit-text-fill-color: hsl(48 100% 90%) !important;
-  caret-color: hsl(48 100% 90%) !important;
+  -webkit-text-fill-color: hsl(44 100% 90%) !important;
+  caret-color: hsl(44 100% 90%) !important;
   transition: background-color 5000s ease-in-out 0s !important;
 }
 
@@ -122,7 +123,7 @@ input:-webkit-autofill:active {
 input[type="number"] {
   background-color: hsl(0 0% 12%) !important;
   border-color: hsl(0 0% 25%) !important;
-  color: hsl(48 100% 90%) !important;
+  color: hsl(44 100% 90%) !important;
   -moz-appearance: textfield !important;
   appearance: textfield !important;
 }
@@ -135,9 +136,9 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 
 input[type="number"]:focus {
-  border-color: hsl(48 100% 65%) !important;
+  border-color: hsl(44 100% 48%) !important;
   outline: none !important;
-  box-shadow: 0 0 0 2px hsl(48 100% 65% / 0.3) !important;
+  box-shadow: 0 0 0 2px hsl(44 100% 48% / 0.3) !important;
 }
 
 /* ============================================ */
@@ -148,18 +149,18 @@ input[type="time"] {
   color-scheme: dark !important;
   background-color: hsl(0 0% 12%) !important;
   border-color: hsl(0 0% 25%) !important;
-  color: hsl(48 100% 90%) !important;
+  color: hsl(44 100% 90%) !important;
 }
 
-/* Ícono del reloj en AMARILLO MATE (no fluorescente) */
+/* Ícono del reloj en AMARILLO #F7B800 */
 input[type="time"]::-webkit-calendar-picker-indicator {
-  filter: brightness(0) saturate(100%) invert(81%) sepia(81%) saturate(1850%) hue-rotate(358deg) brightness(103%) contrast(101%) !important;
+  filter: brightness(0) saturate(100%) invert(78%) sepia(96%) saturate(2000%) hue-rotate(2deg) brightness(101%) contrast(98%) !important;
   cursor: pointer !important;
   opacity: 1 !important;
 }
 
 input[type="time"]::-webkit-calendar-picker-indicator:hover {
-  filter: brightness(0) saturate(100%) invert(89%) sepia(55%) saturate(1000%) hue-rotate(359deg) brightness(105%) contrast(95%) !important;
+  filter: brightness(0) saturate(100%) invert(85%) sepia(70%) saturate(1500%) hue-rotate(2deg) brightness(105%) contrast(95%) !important;
   transform: scale(1.05);
 }
 
@@ -173,7 +174,7 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
 ::-webkit-datetime-edit-hour-field,
 ::-webkit-datetime-edit-minute-field,
 ::-webkit-datetime-edit-ampm-field {
-  color: hsl(48 100% 90%) !important;
+  color: hsl(44 100% 90%) !important;
   background-color: transparent !important;
 }
 
@@ -231,14 +232,14 @@ input[type="week"] {
   color-scheme: dark !important;
   background-color: hsl(0 0% 12%) !important;
   border-color: hsl(0 0% 25%) !important;
-  color: hsl(48 100% 90%) !important;
+  color: hsl(44 100% 90%) !important;
 }
 
 input[type="date"]::-webkit-calendar-picker-indicator,
 input[type="datetime-local"]::-webkit-calendar-picker-indicator,
 input[type="month"]::-webkit-calendar-picker-indicator,
 input[type="week"]::-webkit-calendar-picker-indicator {
-  filter: brightness(0) saturate(100%) invert(81%) sepia(81%) saturate(1850%) hue-rotate(358deg) brightness(103%) contrast(101%) !important;
+  filter: brightness(0) saturate(100%) invert(78%) sepia(96%) saturate(2000%) hue-rotate(2deg) brightness(101%) contrast(98%) !important;
   cursor: pointer !important;
   opacity: 1 !important;
 }
@@ -247,7 +248,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover,
 input[type="datetime-local"]::-webkit-calendar-picker-indicator:hover,
 input[type="month"]::-webkit-calendar-picker-indicator:hover,
 input[type="week"]::-webkit-calendar-picker-indicator:hover {
-  filter: brightness(0) saturate(100%) invert(89%) sepia(55%) saturate(1000%) hue-rotate(359deg) brightness(105%) contrast(95%) !important;
+  filter: brightness(0) saturate(100%) invert(85%) sepia(70%) saturate(1500%) hue-rotate(2deg) brightness(105%) contrast(95%) !important;
   transform: scale(1.05);
 }
 
@@ -255,9 +256,9 @@ input[type="date"]:focus,
 input[type="datetime-local"]:focus,
 input[type="month"]:focus,
 input[type="week"]:focus {
-  border-color: hsl(48 100% 65%) !important;
+  border-color: hsl(44 100% 48%) !important;
   outline: none !important;
-  box-shadow: 0 0 0 2px hsl(48 100% 65% / 0.3) !important;
+  box-shadow: 0 0 0 2px hsl(44 100% 48% / 0.3) !important;
 }
 
 /* ============================================ */
@@ -267,27 +268,27 @@ input[type="week"]:focus {
 select {
   background-color: hsl(0 0% 12%) !important;
   border-color: hsl(0 0% 25%) !important;
-  color: hsl(48 100% 90%) !important;
+  color: hsl(44 100% 90%) !important;
   cursor: pointer;
 }
 
 select option {
   background-color: hsl(0 0% 12%) !important;
-  color: hsl(48 100% 90%) !important;
+  color: hsl(44 100% 90%) !important;
 }
 
 select option:hover,
 select option:focus,
 select option:active,
 select option:checked {
-  background-color: hsl(48 100% 65%) !important;
+  background-color: hsl(44 100% 48%) !important;
   color: hsl(0 0% 5%) !important;
 }
 
 select:focus {
-  border-color: hsl(48 100% 65%) !important;
+  border-color: hsl(44 100% 48%) !important;
   outline: none !important;
-  box-shadow: 0 0 0 2px hsl(48 100% 65% / 0.3) !important;
+  box-shadow: 0 0 0 2px hsl(44 100% 48% / 0.3) !important;
 }
 
 /* ============================================ */
@@ -331,15 +332,15 @@ input.error:focus {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: hsl(48 100% 65% / 0.5);
+  background: hsl(44 100% 48% / 0.5);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: hsl(48 100% 65%);
+  background: hsl(44 100% 48%);
 }
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: hsl(48 100% 65% / 0.5) hsl(0 0% 10%);
+  scrollbar-color: hsl(44 100% 48% / 0.5) hsl(0 0% 10%);
 }

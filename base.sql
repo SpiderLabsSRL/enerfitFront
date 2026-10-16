@@ -47,7 +47,7 @@ CREATE TABLE personas (
 CREATE TABLE empleados (
     id SERIAL PRIMARY KEY,
     persona_id INTEGER NOT NULL,
-    rol VARCHAR(20) CHECK (rol IN ('admin', 'recepcionista', 'entrenador', 'limpieza', 'zumba', 'lactobar')),
+    rol VARCHAR(20) CHECK (rol IN ('admin', 'recepcionista', 'entrenador', 'limpieza')),
     sucursal_id INTEGER NULL,
     sueldo DECIMAL(10, 2) DEFAULT 0,
     comision DECIMAL(10, 2) DEFAULT NULL,
@@ -77,9 +77,11 @@ CREATE TABLE horarios_empleado (
 CREATE TABLE cajas (
     id SERIAL PRIMARY KEY,
     nombre VARCHAR(50) NOT NULL,
-    estado_caja VARCHAR(20) DEFAULT 'cerrada' CHECK (estado_caja IN ('abierta', 'cerrada')),
+    estado_caja VARCHAR(20) DEFAULT 'cerrada' 
+        CHECK (estado_caja IN ('abierta', 'cerrada')),
     total DECIMAL(10,2) DEFAULT 0,
     sucursal_id INTEGER NOT NULL,
+    estado SMALLINT DEFAULT 1 CHECK (estado IN (0, 1, 2)),
     FOREIGN KEY (sucursal_id) REFERENCES sucursales(id) ON DELETE CASCADE,
     CONSTRAINT caja_nombre_sucursal_unique UNIQUE (nombre, sucursal_id)
 );
@@ -424,23 +426,7 @@ CREATE TABLE objetivos_mensuales (
 );
 
 -- ============================================================
--- 24. REPORTES ZUMBA
--- ============================================================
-CREATE TABLE reportes_zumba (
-    id SERIAL PRIMARY KEY,
-    fecha DATE NOT NULL UNIQUE,
-    instructor_id INTEGER NOT NULL,
-    numero_personas INTEGER NOT NULL CHECK (numero_personas >= 0),
-    registrado_por_id INTEGER NOT NULL,
-    registrado_en TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('America/La_Paz', NOW()),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('America/La_Paz', NOW()),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('America/La_Paz', NOW()),
-    FOREIGN KEY (instructor_id) REFERENCES empleados(id) ON DELETE RESTRICT,
-    FOREIGN KEY (registrado_por_id) REFERENCES empleados(id) ON DELETE RESTRICT
-);
-
--- ============================================================
--- 25. SUSCRIPCIÓN (flag de licencia para la app)
+-- 24. SUSCRIPCIÓN (flag de licencia para la app)
 -- ============================================================
 CREATE TABLE suscripcion (
     id SERIAL PRIMARY KEY,
@@ -448,7 +434,7 @@ CREATE TABLE suscripcion (
 );
 
 -- ============================================================
--- 26. MOVIMIENTOS DE FECHAS DE INSCRIPCIÓN (auditoría)
+-- 25. MOVIMIENTOS DE FECHAS DE INSCRIPCIÓN (auditoría)
 -- ============================================================
 CREATE TABLE movimientos_fechas_inscripcion (
     id SERIAL PRIMARY KEY,
@@ -511,7 +497,7 @@ CREATE INDEX idx_movimientos_stock_producto ON movimientos_stock(producto_id, su
 CREATE INDEX idx_cupones_codigo ON cupones(codigo);
 CREATE INDEX idx_cupones_estado ON cupones(estado);
 CREATE INDEX idx_cupones_fechas ON cupones(fecha_inicio, fecha_fin);
-CREATE INDEX idx_cupones_empleado ON cupones(empleado_id);       -- ⭐ NUEVO
+CREATE INDEX idx_cupones_empleado ON cupones(empleado_id);
 CREATE INDEX idx_cupon_sucursal_cupon ON cupon_sucursal(cupon_id);
 CREATE INDEX idx_cupon_sucursal_sucursal ON cupon_sucursal(sucursal_id);
 CREATE INDEX idx_horarios_servicio_dia ON horarios_servicio(dia_semana);
@@ -523,12 +509,11 @@ CREATE INDEX idx_cajas_estado_caja ON cajas(estado_caja);
 CREATE INDEX idx_objetivos_sucursal_mes ON objetivos_mensuales(sucursal_id, mes);
 CREATE INDEX idx_objetivos_mes ON objetivos_mensuales(mes);
 CREATE INDEX idx_objetivos_estado ON objetivos_mensuales(estado);
-CREATE INDEX idx_reportes_zumba_fecha ON reportes_zumba(fecha DESC);
-CREATE INDEX idx_reportes_zumba_instructor ON reportes_zumba(instructor_id);
 CREATE INDEX idx_mov_fechas_insc_inscripcion ON movimientos_fechas_inscripcion(inscripcion_id);
 CREATE INDEX idx_mov_fechas_insc_persona ON movimientos_fechas_inscripcion(persona_id);
 CREATE INDEX idx_mov_fechas_insc_usuario ON movimientos_fechas_inscripcion(usuario_id);
 CREATE INDEX idx_mov_fechas_insc_fecha ON movimientos_fechas_inscripcion(fecha DESC);
+CREATE INDEX idx_cajas_estado ON cajas(estado);
 
 -- ============================================================
 -- COMENTARIOS
@@ -546,6 +531,9 @@ COMMENT ON COLUMN inscripciones.estado_inscripcion IS 'activo | inactivo. Se cal
 COMMENT ON COLUMN productos.estado IS '0=inactivo, 1=activo, 2=eliminado';
 COMMENT ON COLUMN cupones.estado IS '0=inactivo, 1=activo, 2=eliminado';
 COMMENT ON COLUMN objetivos_mensuales.estado IS '0=inactivo, 1=activo, 2=eliminado';
+COMMENT ON COLUMN cajas.estado_caja IS 'abierta | cerrada';
+COMMENT ON COLUMN cajas.total IS 'Monto actual en la caja';
+COMMENT ON COLUMN cajas.estado IS '0=inactivo, 1=activo, 2=eliminado';
 
 COMMENT ON COLUMN productos.imagen IS 'Imagen del producto en formato BYTEA';
 COMMENT ON COLUMN productos.codigo IS 'Código de barras del producto';
@@ -640,8 +628,7 @@ GRANT EXECUTE ON FUNCTION sp_obtener_personas_por_sucursal(integer) TO PUBLIC;
 
 -- Sucursales
 INSERT INTO sucursales (nombre, estado) VALUES
-('Principal', 1),
-('Secundaria', 1);
+('Enerfit', 1);
 
 -- Persona administrador
 INSERT INTO personas (nombres, apellidos, ci, telefono, estado) VALUES
@@ -653,8 +640,7 @@ INSERT INTO empleados (persona_id, rol, sucursal_id, sueldo, comision, estado) V
 
 -- Cajas
 INSERT INTO cajas (nombre, estado_caja, total, sucursal_id) VALUES
-('Caja Principal', 'cerrada', 0, 1),
-('Caja Secundaria', 'cerrada', 0, 2);
+('Caja Principal', 'cerrada', 0, 1);
 
 -- Usuario administrador
 INSERT INTO usuarios (username, password_hash, empleado_id, estado) VALUES
@@ -662,9 +648,7 @@ INSERT INTO usuarios (username, password_hash, empleado_id, estado) VALUES
 
 -- Tipos de servicio
 INSERT INTO tipos_servicio (nombre, estado) VALUES
-('Gimnasio', 1),
-('Zumba', 1),
-('Entrenamiento', 1);
+('Gimnasio', 1);
 
 -- Suscripción
 INSERT INTO suscripcion (pagado) VALUES (true);

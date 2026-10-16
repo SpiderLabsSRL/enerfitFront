@@ -141,7 +141,6 @@ export const CARGOS = [
   "entrenador",
   "limpieza",
   "lactobar",
-  "zumba",
 ] as const;
 
 export const ROLES_CON_ACCESO = ["admin", "recepcionista"];
@@ -151,7 +150,6 @@ export const ROLES_SIN_CAJA = [
   "entrenador",
   "limpieza",
   "lactobar",
-  "zumba",
 ];
 
 export const DIAS_SEMANA: { id: number; nombre: string }[] = [

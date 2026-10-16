@@ -490,7 +490,6 @@ export interface EmpleadoReporte {
   sucursalNombres: string[];
   sueldoBase: number;
   comision: number;
-  tipo: "normal" | "zumba";
   tieneHuella: boolean;
   activo: boolean;
 }
@@ -514,21 +513,9 @@ export interface AtrasoEmpleado {
 export interface PagoMensualInfo {
   empleadoId: string;
   empleadoNombre: string;
-  tipo: "normal" | "zumba";
   sueldoBase: number;
   comision: number;
   sueldoNeto: number;
-  totalPersonas?: number;
-  diasRegistrados?: number;
-  valorComision?: number;
-}
-
-export interface ReporteZumba {
-  id: string;
-  fecha: string;
-  instructorId: string;
-  instructorNombre: string;
-  numeroPersonas: number;
 }
 
 // ============================================
@@ -602,24 +589,6 @@ export const actualizarSueldoEmpleado = async (
   } catch (error) {
     console.error("Error actualizando sueldo:", error);
     throw new Error("No se pudo actualizar el sueldo");
-  }
-};
-
-export const getReportesZumba = async (
-  mes: string,
-  instructorId?: string
-): Promise<ReporteZumba[]> => {
-  try {
-    const params: any = { mes };
-    if (instructorId) params.instructorId = instructorId;
-
-    const response = await api.get<ReporteZumba[]>("/reports/zumba", {
-      params,
-    });
-    return response.data;
-  } catch (error) {
-    console.error("Error fetching reportes zumba:", error);
-    throw new Error("No se pudieron cargar los reportes de zumba");
   }
 };
 

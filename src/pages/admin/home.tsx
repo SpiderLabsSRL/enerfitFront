@@ -58,7 +58,7 @@ export function Home() {
                 <img
                   src={mutantLogo}
                   alt="ENERFIT"
-                  className="h-14 mx-auto"
+                  className="h-16 mx-auto object-contain"
                 />
               </div>
             </div>

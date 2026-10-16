@@ -701,7 +701,7 @@ export function AdminLayout() {
           <img
             src={mutantLogo}
             alt="MUTANT"
-            className={`h-[50px] w-auto flex-shrink-0 object-contain transition-all duration-300 ${
+            className={`h-[70px] w-auto flex-shrink-0 object-contain transition-all duration-300 ${
               sidebarCollapsed ? "ml-0" : ""
             }`}
           />

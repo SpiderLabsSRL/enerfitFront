@@ -207,7 +207,7 @@ export function LoginForm() {
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <Card className="w-full max-w-md gym-card relative">
         <CardHeader className="text-center space-y-4">
-          <img src={mutantLogo} alt="ENERFIT" className="h-16 mx-auto" />
+          <img src={mutantLogo} alt="ENERFIT" className="h-28 mx-auto" />
           <CardTitle className="text-3xl font-bold text-primary">
             INICIAR SESIÓN
           </CardTitle>

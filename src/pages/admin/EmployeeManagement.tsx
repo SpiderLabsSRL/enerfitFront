@@ -29,7 +29,6 @@ import {
   ChevronsLeft,
   ChevronsRight,
   Eye,
-  Music,
   AlertCircle,
   Loader2,
 } from "lucide-react";
@@ -358,8 +357,7 @@ export function EmployeeManagement() {
     if (
       formData.cargo === "limpieza" ||
       formData.cargo === "entrenador" ||
-      formData.cargo === "lactobar" ||
-      formData.cargo === "zumba"
+      formData.cargo === "lactobar"
     ) {
       if (!formData.sucursal_id) errors.sucursal_id = "La sucursal es obligatoria";
       const tieneHorarios = horarios.some((dia) => dia.horarios.length > 0);
@@ -814,10 +812,7 @@ export function EmployeeManagement() {
                       <SelectContent>
                         {CARGOS.map((c) => (
                           <SelectItem key={c} value={c} className="capitalize">
-                            <div className="flex items-center gap-2">
-                              {c === "zumba" && <Music className="h-4 w-4" />}
-                              <span>{c}</span>
-                            </div>
+                            <span>{c}</span>
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -1188,10 +1183,7 @@ export function EmployeeManagement() {
                   <SelectItem value="all">Todos los cargos</SelectItem>
                   {CARGOS.map((c) => (
                     <SelectItem key={c} value={c} className="capitalize">
-                      <div className="flex items-center gap-2">
-                        {c === "zumba" && <Music className="h-4 w-4" />}
-                        <span>{c}</span>
-                      </div>
+                      <span>{c}</span>
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -1240,10 +1232,7 @@ export function EmployeeManagement() {
                 {paginatedEmployees.map((employee) => (
                   <TableRow key={employee.id}>
                     <TableCell className="font-medium">
-                      <div className="flex items-center gap-2">
-                        {employee.cargo === "zumba" && <Music className="h-4 w-4" />}
-                        <span>{`${employee.nombres} ${employee.apellidos}`}</span>
-                      </div>
+                      <span>{`${employee.nombres} ${employee.apellidos}`}</span>
                     </TableCell>
                     <TableCell>{employee.ci}</TableCell>
                     <TableCell>{employee.telefono}</TableCell>
@@ -1358,7 +1347,6 @@ export function EmployeeManagement() {
               <div className="flex justify-between items-start mb-2">
                 <div>
                   <div className="flex items-center gap-2">
-                    {employee.cargo === "zumba" && <Music className="h-4 w-4" />}
                     <h3 className="font-semibold text-base">
                       {employee.nombres} {employee.apellidos}
                     </h3>
