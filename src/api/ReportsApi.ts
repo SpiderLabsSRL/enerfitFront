@@ -179,6 +179,31 @@ export interface MovimientoFechaInscripcion {
 }
 
 // ============================================
+// INSCRIPCIONES NUEVAS VS REINSCRIPCIONES
+// ============================================
+export interface InscripcionesNuevasVsReinscritasResumen {
+  nuevas: number;
+  reinscripciones: number;
+  nuevasConCupon: number;
+  reinscripcionesConCupon: number;
+  nuevasSinCupon: number;
+  reinscripcionesSinCupon: number;
+  total: number;
+}
+
+export interface InscripcionesPorCupon {
+  cupon: string;
+  nuevas: number;
+  reinscripciones: number;
+  total: number;
+}
+
+export interface InscripcionesNuevasVsReinscritas {
+  resumen: InscripcionesNuevasVsReinscritasResumen;
+  porCupon: InscripcionesPorCupon[];
+}
+
+// ============================================
 // AXIOS INSTANCE
 // ============================================
 const api = axios.create({
@@ -611,5 +636,34 @@ export const getMovimientosFechasInscripcion = async (
   } catch (error) {
     console.error("Error fetching movimientos fechas inscripción:", error);
     throw new Error("No se pudieron cargar los movimientos de fechas de inscripción");
+  }
+};
+
+// ============================================
+// INSCRIPCIONES NUEVAS VS REINSCRIPCIONES
+// ============================================
+export const getInscripcionesNuevasVsReinscritas = async (
+  mes: string,
+  sucursalId?: string,
+  cuponId?: string
+): Promise<InscripcionesNuevasVsReinscritas> => {
+  try {
+    const params: any = { mes };
+    if (sucursalId && sucursalId !== "all") params.sucursalId = sucursalId;
+    if (cuponId && cuponId !== "all") params.cuponId = cuponId;
+
+    const response = await api.get<InscripcionesNuevasVsReinscritas>(
+      "/reports/inscripciones-nuevas-vs-reinscritas",
+      { params }
+    );
+    return response.data;
+  } catch (error) {
+    console.error(
+      "Error fetching inscripciones nuevas vs reinscritas:",
+      error
+    );
+    throw new Error(
+      "No se pudieron cargar las inscripciones nuevas vs reinscritas"
+    );
   }
 };
