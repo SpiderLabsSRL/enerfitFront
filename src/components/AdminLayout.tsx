@@ -28,7 +28,6 @@ import {
   MapPin,
   Image,
   LayoutDashboard,
-  Music,
   ChevronRight,
   ChevronLeft,
   PanelLeftClose,
@@ -160,12 +159,6 @@ const additionalSidebarItems: SidebarItem[] = [
     title: "Control de Acceso",
     icon: Fingerprint,
     path: "/admin/access",
-    roles: ["recepcionista"],
-  },
-  {
-    title: "Zumba",
-    icon: Music,
-    path: "/admin/zumba",
     roles: ["recepcionista"],
   },
 ];
@@ -457,7 +450,6 @@ export function AdminLayout() {
         "Vender Producto",
         "Control de Ventas",
         "Nueva Transacción",
-        "Zumba",
       ];
 
       const todosItems = [...filteredMainItems, ...filteredAdditionalItems];

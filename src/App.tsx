@@ -30,7 +30,6 @@ import { ReporteServicios } from "./pages/admin/ReporteServicios";
 import { ReporteProductos } from "./pages/admin/ReporteProductos";
 import { ReporteEmpleados } from "./pages/admin/ReporteEmpleados";
 import { Cupones } from "./pages/admin/Cupones";
-import { Zumba } from "./pages/admin/Zumba";
 
 const queryClient = new QueryClient();
 
@@ -158,7 +157,6 @@ const AppRoutes = () => {
         <Route path="reporte-empleados" element={<ReporteEmpleados />} />
         <Route path="employees" element={<EmployeeManagement />} />
         <Route path="cupones" element={<Cupones />} />
-        <Route path="zumba" element={<Zumba />} />
       </Route>
 
       <Route path="/redirect-by-role" element={<RoleBasedRedirect />} />

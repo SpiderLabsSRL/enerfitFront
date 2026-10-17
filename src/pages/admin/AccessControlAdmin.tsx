@@ -69,7 +69,9 @@ export function AccessControlAdmin() {
   const [successHighlightIds, setSuccessHighlightIds] = useState<Set<string>>(
     new Set(),
   );
-  const highlightTimeoutsRef = useRef<Record<string, NodeJS.Timeout>>({});
+  const highlightTimeoutsRef = useRef<
+    Record<string, ReturnType<typeof setTimeout>>
+  >({});
 
   // ============================================
   // Buscador discreto de registros (lupa)
