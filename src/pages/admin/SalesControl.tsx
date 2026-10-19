@@ -58,16 +58,21 @@ import {
   FileText,
   BarChart3,
   UserCheck,
+  Trash2,
+  AlertTriangle,
+  Lock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   getSales,
   getSucursales,
   getTotalSales,
+  anularVenta,
   type SaleRecord,
   type Sucursal,
   type FilterTotals,
 } from "@/api/SalesControlapi";
+import { useToast } from "@/hooks/use-toast";
 
 // ============================================
 // TIPOS
@@ -104,6 +109,26 @@ type DateFilterType =
   | "specific"
   | "range"
   | "all";
+
+// ============================================
+// HELPER: ¿La venta es de hoy?
+// fecha viene como "DD/MM/YYYY, HH24:MI:SS"
+// ============================================
+function isSaleFromToday(fechaStr: string): boolean {
+  try {
+    const parts = fechaStr.split(", ");
+    if (parts.length < 1) return false;
+    const [day, month, year] = parts[0].split("/").map(Number);
+    const now = new Date();
+    return (
+      day === now.getDate() &&
+      month === now.getMonth() + 1 &&
+      year === now.getFullYear()
+    );
+  } catch {
+    return false;
+  }
+}
 
 // ============================================
 // CALENDARIO SIMPLE
@@ -401,6 +426,7 @@ function ResumenDetalladoModal({
 // ============================================
 export function SalesControl() {
   const { user } = useUser();
+  const { toast } = useToast();
 
   const [salesData, setSalesData] = useState<{
     sales: SaleRecord[];
@@ -442,6 +468,11 @@ export function SalesControl() {
   const [specificDateOpen, setSpecificDateOpen] = useState(false);
   const [showFilters, setShowFilters] = useState(true);
 
+  // ✅ Estado para anular
+  const [saleToAnular, setSaleToAnular] = useState<SaleRecord | null>(null);
+  const [isAnularModalOpen, setIsAnularModalOpen] = useState(false);
+  const [isAnulando, setIsAnulando] = useState(false);
+
   const [totales, setTotales] = useState<FilterTotals>({
     totalGeneral: 0,
     efectivoGeneral: 0,
@@ -459,6 +490,7 @@ export function SalesControl() {
   const [isResumenModalOpen, setIsResumenModalOpen] = useState(false);
 
   const esRecepcionista = user?.rol === "recepcionista";
+  const esAdmin = user?.rol === "admin" || user?.rol === "superadmin";
 
   // ============================================
   // HELPERS
@@ -503,9 +535,7 @@ export function SalesControl() {
   const cargarDatos = useCallback(async () => {
     setLoading(true);
     try {
-      const filters: any = {
-        dateFilterType,
-      };
+      const filters: any = { dateFilterType };
 
       if (dateFilterType === "specific" && specificDate) {
         filters.specificDate = formatDateForBackend(specificDate);
@@ -549,7 +579,7 @@ export function SalesControl() {
   }, [cargarDatos]);
 
   // ============================================
-  // FILTRO LOCAL: solo método de pago
+  // FILTRO LOCAL: método de pago
   // ============================================
   const salesFiltradasPorMetodo = useMemo(() => {
     if (selectedMetodoPago === "all") return allSales;
@@ -605,6 +635,65 @@ export function SalesControl() {
   const handleViewDetails = (sale: SaleRecord) => {
     setSelectedSale(sale);
     setIsDetailModalOpen(true);
+  };
+
+  // ============================================
+  // ✅ ABRIR MODAL DE ANULAR
+  // ============================================
+  const handleOpenAnular = (sale: SaleRecord) => {
+    if (!esAdmin) {
+      toast({
+        title: "No autorizado",
+        description: "Solo un administrador puede anular ventas.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!isSaleFromToday(sale.fecha)) {
+      toast({
+        title: "No se puede anular",
+        description: "Solo se pueden anular ventas realizadas el día de hoy.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setSaleToAnular(sale);
+    setIsAnularModalOpen(true);
+  };
+
+  // ============================================
+  // ✅ CONFIRMAR ANULACIÓN
+  // ============================================
+  const handleConfirmAnular = async () => {
+    if (!saleToAnular) return;
+
+    setIsAnulando(true);
+    try {
+      const result = await anularVenta(saleToAnular.id, saleToAnular.tipo);
+
+      toast({
+        title: "✅ Venta anulada",
+        description: result.message,
+      });
+
+      setIsAnularModalOpen(false);
+      setSaleToAnular(null);
+      setIsDetailModalOpen(false);
+      setSelectedSale(null);
+
+      // Recargar datos para reflejar cambios
+      await cargarDatos();
+    } catch (error: any) {
+      toast({
+        title: "❌ Error al anular",
+        description: error.message || "No se pudo anular la venta",
+        variant: "destructive",
+      });
+    } finally {
+      setIsAnulando(false);
+    }
   };
 
   // ============================================
@@ -909,6 +998,38 @@ export function SalesControl() {
   };
 
   // ============================================
+  // BOTÓN DE ANULAR (solo admin + venta de hoy)
+  // ============================================
+  const renderAnularButton = (sale: SaleRecord) => {
+    if (!esAdmin) return null;
+    const esHoy = isSaleFromToday(sale.fecha);
+    if (!esHoy) {
+      return (
+        <Button
+          variant="ghost"
+          size="icon"
+          disabled
+          title="Solo se pueden anular ventas de hoy"
+          className="h-7 w-7 md:h-8 md:w-8 opacity-40"
+        >
+          <Lock className="h-3 w-3 md:h-4 md:w-4" />
+        </Button>
+      );
+    }
+    return (
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={() => handleOpenAnular(sale)}
+        title="Anular venta"
+        className="h-7 w-7 md:h-8 md:w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+      >
+        <Trash2 className="h-3 w-3 md:h-4 md:w-4" />
+      </Button>
+    );
+  };
+
+  // ============================================
   // LOADING
   // ============================================
   if (loading && allSales.length === 0) {
@@ -945,7 +1066,6 @@ export function SalesControl() {
           )}
         </div>
 
-        {/* Botones */}
         <div className="grid grid-cols-3 gap-2 w-full sm:flex sm:justify-end sm:w-auto">
           <Button
             variant="default"
@@ -1329,7 +1449,7 @@ export function SalesControl() {
                           <TableHead className="min-w-[90px] text-xs">
                             Detalle
                           </TableHead>
-                          <TableHead className="w-[40px]"></TableHead>
+                          <TableHead className="w-[80px]"></TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -1373,14 +1493,17 @@ export function SalesControl() {
                                 {formatPaymentDetails(sale)}
                               </TableCell>
                               <TableCell>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => handleViewDetails(sale)}
-                                  className="h-7 w-7 md:h-8 md:w-8"
-                                >
-                                  <Eye className="h-3 w-3 md:h-4 md:w-4" />
-                                </Button>
+                                <div className="flex items-center gap-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleViewDetails(sale)}
+                                    className="h-7 w-7 md:h-8 md:w-8"
+                                  >
+                                    <Eye className="h-3 w-3 md:h-4 md:w-4" />
+                                  </Button>
+                                  {renderAnularButton(sale)}
+                                </div>
                               </TableCell>
                             </TableRow>
                           ))
@@ -1425,7 +1548,7 @@ export function SalesControl() {
                           <TableHead className="min-w-[90px] text-xs">
                             Detalle
                           </TableHead>
-                          <TableHead className="w-[40px]"></TableHead>
+                          <TableHead className="w-[80px]"></TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -1472,14 +1595,17 @@ export function SalesControl() {
                                 {formatPaymentDetails(sale)}
                               </TableCell>
                               <TableCell>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => handleViewDetails(sale)}
-                                  className="h-7 w-7 md:h-8 md:w-8"
-                                >
-                                  <Eye className="h-3 w-3 md:h-4 md:w-4" />
-                                </Button>
+                                <div className="flex items-center gap-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleViewDetails(sale)}
+                                    className="h-7 w-7 md:h-8 md:w-8"
+                                  >
+                                    <Eye className="h-3 w-3 md:h-4 md:w-4" />
+                                  </Button>
+                                  {renderAnularButton(sale)}
+                                </div>
                               </TableCell>
                             </TableRow>
                           ))
@@ -1630,12 +1756,121 @@ export function SalesControl() {
                   </p>
                 </div>
               )}
+
+              {/* Botón anular dentro del modal (solo admin + hoy) */}
+              {esAdmin && isSaleFromToday(selectedSale.fecha) && (
+                <div className="pt-2 border-t">
+                  <Button
+                    variant="destructive"
+                    className="w-full"
+                    onClick={() => handleOpenAnular(selectedSale)}
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Anular esta venta
+                  </Button>
+                </div>
+              )}
             </div>
           ) : (
             <p className="text-center text-muted-foreground text-sm">
               No se pudieron cargar los detalles.
             </p>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* ✅ Modal de confirmación de anulación */}
+      <Dialog open={isAnularModalOpen} onOpenChange={setIsAnularModalOpen}>
+        <DialogContent className="max-w-[95vw] md:max-w-md p-4 md:p-6">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-5 w-5" />
+              Anular Venta
+            </DialogTitle>
+            <DialogDescription className="text-xs md:text-sm">
+              Esta acción no se puede deshacer.
+            </DialogDescription>
+          </DialogHeader>
+
+          {saleToAnular && (
+            <div className="space-y-3 text-sm">
+              <div className="p-3 bg-muted/30 rounded-lg space-y-1 text-xs md:text-sm">
+                <p>
+                  <span className="text-muted-foreground">Venta #:</span>{" "}
+                  {saleToAnular.id}
+                </p>
+                <p>
+                  <span className="text-muted-foreground">Tipo:</span>{" "}
+                  {saleToAnular.tipo === "producto"
+                    ? "Productos"
+                    : "Servicios"}
+                </p>
+                <p>
+                  <span className="text-muted-foreground">Fecha:</span>{" "}
+                  {saleToAnular.fecha}
+                </p>
+                <p>
+                  <span className="text-muted-foreground">Total:</span> Bs.{" "}
+                  {saleToAnular.total.toFixed(2)}
+                </p>
+              </div>
+
+              <div className="p-3 bg-amber-50 dark:bg-amber-950/30 rounded-lg text-xs md:text-sm text-amber-900 dark:text-amber-200">
+                <p className="font-medium mb-1">Se realizarán los siguientes cambios:</p>
+                <ul className="list-disc list-inside space-y-0.5">
+                  {saleToAnular.tipo === "producto" ? (
+                    <>
+                      <li>Se eliminará la venta y su detalle</li>
+                      <li>Se devolverá el stock de los productos</li>
+                    </>
+                  ) : (
+                    <>
+                      <li>Se eliminará la venta y su detalle</li>
+                      <li>Se eliminarán las inscripciones asociadas</li>
+                      <li>La persona NO se elimina</li>
+                    </>
+                  )}
+                  {(saleToAnular.efectivo || 0) > 0 && (
+                    <li>
+                      Se revertirá Bs. {(saleToAnular.efectivo || 0).toFixed(2)}{" "}
+                      de la caja
+                    </li>
+                  )}
+                  <li>Se revertirá el uso del cupón (si se usó)</li>
+                </ul>
+              </div>
+            </div>
+          )}
+
+          <div className="flex justify-end gap-2 pt-4">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsAnularModalOpen(false);
+                setSaleToAnular(null);
+              }}
+              disabled={isAnulando}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleConfirmAnular}
+              disabled={isAnulando}
+            >
+              {isAnulando ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Anulando...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Confirmar Anulación
+                </>
+              )}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
 

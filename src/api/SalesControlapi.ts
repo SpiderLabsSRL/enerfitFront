@@ -1,3 +1,4 @@
+// src/api/SalesControlapi.ts
 import axios from "axios";
 import { getStoredUserData } from "./loginapi";
 
@@ -82,6 +83,13 @@ export interface FilterTotals {
   qrServicios: number;
 }
 
+export interface AnularVentaResponse {
+  success: boolean;
+  message: string;
+  ventaId: number;
+  tipo: "producto" | "servicio";
+}
+
 interface SalesFilters {
   dateFilterType?:
     | "all"
@@ -140,10 +148,7 @@ function withForcedSucursal(filters: SalesFilters): SalesFilters {
 }
 
 // ============================================
-// ✅ HELPER: Fuerza el filtro empleadoId cuando el rol es recepcionista.
-//    Enviamos el idusuario del JWT (columna `id` de usuarios), que es
-//    lo que el backend espera para aplicar `empleado_id = ...`.
-//    El backend de todos modos lo re-forzará siempre.
+// HELPER: Fuerza empleadoId cuando el rol es recepcionista
 // ============================================
 function withForcedEmpleado(filters: SalesFilters): SalesFilters {
   const userData = getStoredUserData();
@@ -166,9 +171,6 @@ function withForcedEmpleado(filters: SalesFilters): SalesFilters {
   return filters;
 }
 
-// ============================================
-// Aplica ambos forzados
-// ============================================
 function applyForcedFilters(filters: SalesFilters): SalesFilters {
   return withForcedEmpleado(withForcedSucursal(filters));
 }
@@ -418,5 +420,49 @@ export const getSucursales = async (): Promise<Sucursal[]> => {
     );
 
     throw new Error("No se pudieron cargar las sucursales");
+  }
+};
+
+// ============================================
+// ✅ ANULAR VENTA
+// ============================================
+export const anularVenta = async (
+  saleId: string,
+  saleType: "producto" | "servicio"
+): Promise<AnularVentaResponse> => {
+  try {
+    const response = await api.delete<AnularVentaResponse>(
+      `/sales/${saleId}`,
+      {
+        params: { type: saleType },
+      }
+    );
+    return response.data;
+  } catch (error: any) {
+    console.error(
+      "❌ Error anulando venta:",
+      error.response?.data || error.message
+    );
+
+    if (error.response?.status === 403) {
+      throw new Error(
+        error.response.data.error ||
+          "Solo un administrador puede anular ventas"
+      );
+    }
+
+    if (error.response?.status === 400) {
+      throw new Error(
+        error.response.data.error || "No se puede anular esta venta"
+      );
+    }
+
+    if (error.response?.status === 404) {
+      throw new Error(error.response.data.error || "La venta no existe");
+    }
+
+    throw new Error(
+      error.response?.data?.error || "No se pudo anular la venta"
+    );
   }
 };
