@@ -13,9 +13,6 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
 } from "recharts";
 import {
   Users,
@@ -24,9 +21,6 @@ import {
   Loader2,
   DollarSign,
   Eye,
-  UserPlus,
-  Repeat,
-  Tag,
 } from "lucide-react";
 import {
   getEmpleadosReporte,
@@ -35,11 +29,9 @@ import {
   actualizarSueldoEmpleado,
   Sucursal,
   getSucursales,
-  getInscripcionesNuevasVsReinscritas,
   type EmpleadoReporte,
   type AtrasoEmpleado,
   type PagoMensualInfo,
-  type InscripcionesNuevasVsReinscritas,
 } from "@/api/ReportsApi";
 import {
   Dialog,
@@ -121,9 +113,6 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   return null;
 };
 
-const COLORS_NUEVAS = "#10B981";
-const COLORS_REINSCRIPCIONES = "#8B5CF6";
-
 export function ReporteEmpleados() {
   const [selectedSucursal, setSelectedSucursal] = useState<string>("all");
   const [sucursales, setSucursales] = useState<Sucursal[]>([]);
@@ -134,14 +123,6 @@ export function ReporteEmpleados() {
   const [empleados, setEmpleados] = useState<EmpleadoReporte[]>([]);
   const [atrasosCompletos, setAtrasosCompletos] = useState<AtrasoEmpleado[]>([]);
   const [pagosInfo, setPagosInfo] = useState<PagoMensualInfo[]>([]);
-
-  // ============================================
-  // Estado para cupones / inscripciones
-  // ============================================
-  const [inscripcionesCupones, setInscripcionesCupones] =
-    useState<InscripcionesNuevasVsReinscritas | null>(null);
-  const [selectedCupon, setSelectedCupon] = useState<string>("all");
-  const [loadingCupones, setLoadingCupones] = useState<boolean>(false);
 
   const [mesActual] = useState<string>(() => {
     const now = getBoliviaDate();
@@ -197,25 +178,6 @@ export function ReporteEmpleados() {
     }
   }, [mesActual, selectedSucursal]);
 
-  // ============================================
-  // Cargar inscripciones/cupones
-  // ============================================
-  const cargarCupones = useCallback(async () => {
-    try {
-      setLoadingCupones(true);
-      const res = await getInscripcionesNuevasVsReinscritas(
-        mesActual,
-        selectedSucursal !== "all" ? selectedSucursal : undefined,
-        selectedCupon !== "all" ? selectedCupon : undefined
-      );
-      setInscripcionesCupones(res);
-    } catch (err) {
-      console.error("Error al cargar cupones:", err);
-    } finally {
-      setLoadingCupones(false);
-    }
-  }, [mesActual, selectedSucursal, selectedCupon]);
-
   useEffect(() => {
     cargarSucursales();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -224,10 +186,6 @@ export function ReporteEmpleados() {
   useEffect(() => {
     cargarDatos();
   }, [cargarDatos]);
-
-  useEffect(() => {
-    cargarCupones();
-  }, [cargarCupones]);
 
   const abrirEditorSueldo = (empleado: EmpleadoReporte) => {
     setEditandoSueldo(empleado.id);
@@ -309,48 +267,6 @@ export function ReporteEmpleados() {
     );
   }
 
-  const resumenCupones = inscripcionesCupones?.resumen ?? {
-    nuevas: 0,
-    reinscripciones: 0,
-    nuevasConCupon: 0,
-    reinscripcionesConCupon: 0,
-    nuevasSinCupon: 0,
-    reinscripcionesSinCupon: 0,
-    total: 0,
-  };
-
-  const pieDataCupones = [
-    { name: "Nuevas", value: resumenCupones.nuevas, color: COLORS_NUEVAS },
-    {
-      name: "Reinscripciones",
-      value: resumenCupones.reinscripciones,
-      color: COLORS_REINSCRIPCIONES,
-    },
-  ].filter((d) => d.value > 0);
-
-  const cuponData = [
-    {
-      name: "Nuevas con cupón",
-      value: resumenCupones.nuevasConCupon,
-      fill: COLORS_NUEVAS,
-    },
-    {
-      name: "Nuevas sin cupón",
-      value: resumenCupones.nuevasSinCupon,
-      fill: "#34D399",
-    },
-    {
-      name: "Reinscritas con cupón",
-      value: resumenCupones.reinscripcionesConCupon,
-      fill: COLORS_REINSCRIPCIONES,
-    },
-    {
-      name: "Reinscritas sin cupón",
-      value: resumenCupones.reinscripcionesSinCupon,
-      fill: "#A78BFA",
-    },
-  ];
-
   return (
     <div className="space-y-6">
       {/* HEADER */}
@@ -360,7 +276,7 @@ export function ReporteEmpleados() {
             Reporte de Empleados
           </h1>
           <p className="text-sm text-muted-foreground">
-            Gestión de asistencia, atrasos, pagos mensuales y cupones
+            Gestión de asistencia, atrasos y pagos mensuales
           </p>
         </div>
 
@@ -695,237 +611,6 @@ export function ReporteEmpleados() {
           </div>
         </CardContent>
       </Card>
-      <div className="space-y-4">
-        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h2 className="text-xl font-bold text-primary flex items-center gap-2">
-              <Tag className="h-5 w-5" />
-              Inscripciones: Nuevas vs Reinscripciones
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              Conteo mensual con o sin cupón aplicado — {formatearMes(mesActual)}
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <Tag className="h-4 w-4 text-primary" />
-            <Select value={selectedCupon} onValueChange={setSelectedCupon}>
-              <SelectTrigger className="w-[160px] h-8 text-sm">
-                <SelectValue placeholder="Cupón" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
-                <SelectItem value="con-cupon">Con cupón</SelectItem>
-                <SelectItem value="sin-cupon">Sin cupón</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-
-        {loadingCupones ? (
-          <div className="flex items-center justify-center h-40">
-            <Loader2 className="h-6 w-6 animate-spin text-primary" />
-            <span className="ml-2 text-sm">Cargando cupones...</span>
-          </div>
-        ) : (
-          <>
-            {/* Tarjetas resumen de cupones */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">
-                    Total Inscripciones
-                  </CardTitle>
-                  <Users className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-primary">
-                    {resumenCupones.total}
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">
-                    Personas Nuevas
-                  </CardTitle>
-                  <UserPlus className="h-4 w-4 text-emerald-500" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-emerald-500">
-                    {resumenCupones.nuevas}
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    {resumenCupones.nuevasConCupon} con cupón ·{" "}
-                    {resumenCupones.nuevasSinCupon} sin cupón
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">
-                    Reinscripciones
-                  </CardTitle>
-                  <Repeat className="h-4 w-4 text-purple-500" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-purple-500">
-                    {resumenCupones.reinscripciones}
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    {resumenCupones.reinscripcionesConCupon} con cupón ·{" "}
-                    {resumenCupones.reinscripcionesSinCupon} sin cupón
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-gradient-to-r from-primary/10 to-primary/5">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">
-                    Uso de Cupones
-                  </CardTitle>
-                  <Tag className="h-4 w-4 text-primary" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-primary">
-                    {resumenCupones.nuevasConCupon +
-                      resumenCupones.reinscripcionesConCupon}
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    de {resumenCupones.total} inscripciones
-                  </p>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Gráficos de cupones */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-primary">
-                    Distribución Nuevas vs Reinscripciones
-                  </CardTitle>
-                  <CardDescription>
-                    Proporción del mes seleccionado
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {pieDataCupones.length === 0 ? (
-                    <div className="flex items-center justify-center h-[300px] text-muted-foreground">
-                      Sin datos para este período
-                    </div>
-                  ) : (
-                    <ResponsiveContainer width="100%" height={300}>
-                      <PieChart>
-                        <Pie
-                          data={pieDataCupones}
-                          dataKey="value"
-                          nameKey="name"
-                          cx="50%"
-                          cy="50%"
-                          outerRadius={100}
-                          label={(entry) => `${entry.name}: ${entry.value}`}
-                        >
-                          {pieDataCupones.map((entry, index) => (
-                            <Cell key={index} fill={entry.color} />
-                          ))}
-                        </Pie>
-                        <Tooltip />
-                        <Legend />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-primary">
-                    Desglose por uso de cupón
-                  </CardTitle>
-                  <CardDescription>
-                    Nuevas y reinscripciones con y sin cupón
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={cuponData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" />
-                      <XAxis
-                        dataKey="name"
-                        fontSize={11}
-                        angle={-20}
-                        textAnchor="end"
-                        height={70}
-                        tick={{ fill: "#a0a0a0" }}
-                      />
-                      <YAxis fontSize={12} tick={{ fill: "#a0a0a0" }} />
-                      <Tooltip />
-                      <Bar
-                        dataKey="value"
-                        name="Cantidad"
-                        radius={[4, 4, 0, 0]}
-                      />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Tabla por cupón */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-primary">
-                  <Tag className="h-5 w-5" />
-                  Detalle por cupón
-                </CardTitle>
-                <CardDescription>
-                  Cantidad de inscripciones nuevas y reinscripciones por cupón
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {inscripcionesCupones?.porCupon.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    No hay datos para este período
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    <div className="grid grid-cols-4 gap-2 text-xs font-semibold text-muted-foreground px-3">
-                      <div>Cupón</div>
-                      <div className="text-center">Nuevas</div>
-                      <div className="text-center">Reinscripciones</div>
-                      <div className="text-center">Total</div>
-                    </div>
-                    {inscripcionesCupones?.porCupon.map((row, idx) => (
-                      <div
-                        key={idx}
-                        className="grid grid-cols-4 gap-2 items-center p-3 border rounded-lg"
-                      >
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline" className="text-xs">
-                            {row.cupon}
-                          </Badge>
-                        </div>
-                        <div className="text-center text-emerald-500 font-medium">
-                          {row.nuevas}
-                        </div>
-                        <div className="text-center text-purple-500 font-medium">
-                          {row.reinscripciones}
-                        </div>
-                        <div className="text-center font-bold text-primary">
-                          {row.total}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </>
-        )}
-      </div>
     </div>
   );
 }
