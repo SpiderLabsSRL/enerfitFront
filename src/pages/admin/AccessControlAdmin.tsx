@@ -66,6 +66,17 @@ export function AccessControlAdmin() {
   const [selectedMemberForDetails, setSelectedMemberForDetails] =
     useState<ApiMember | null>(null);
 
+  // ============================================
+  // 🆕 Selección de servicio tras huella (2+ servicios)
+  // ============================================
+  const [fingerprintSelection, setFingerprintSelection] = useState<{
+    memberId: string;
+    memberName: string;
+    ci: string;
+    services: AccessApi.FingerprintServiceOption[];
+  } | null>(null);
+  const [fingerprintProcessing, setFingerprintProcessing] = useState(false);
+
   const [successHighlightIds, setSuccessHighlightIds] = useState<Set<string>>(
     new Set(),
   );
@@ -111,14 +122,10 @@ export function AccessControlAdmin() {
     ),
   ];
 
-  // El ID del registro MÁS RECIENTE (el primero en la lista)
   const mostRecentLogId = allLogs.length > 0 ? allLogs[0].id : null;
 
   // ============================================
   // Filtrado por búsqueda de logs (frontend, solo hoy)
-  // - Soporta múltiples palabras (todas deben aparecer)
-  // - Normaliza tildes y espacios múltiples
-  // - Busca en nombre, CI y detalle
   // ============================================
   const filteredLogs = useMemo(() => {
     const rawTerm = logSearchTerm.trim().toLowerCase();
@@ -139,8 +146,6 @@ export function AccessControlAdmin() {
       const haystack = normalize(
         `${log.memberName || ""} ${log.ci || ""} ${log.detail || ""}`
       );
-
-      // Todas las palabras del término deben aparecer en el haystack
       return termWords.every((word) => haystack.includes(word));
     });
   }, [allLogs, logSearchTerm]);
@@ -153,12 +158,10 @@ export function AccessControlAdmin() {
     Math.ceil(filteredLogs.length / PAGE_SIZE),
   );
 
-  // Reset page cuando cambian filtros o búsqueda
   useEffect(() => {
     setCurrentPage(1);
   }, [typeFilter, logSearchTerm, searchTerm]);
 
-  // Si la página actual excede el total, ajustar
   useEffect(() => {
     if (currentPage > totalPages) setCurrentPage(totalPages);
   }, [currentPage, totalPages]);
@@ -181,9 +184,6 @@ export function AccessControlAdmin() {
     };
   }, []);
 
-  // ============================================
-  // Focus al input cuando se abre el buscador
-  // ============================================
   useEffect(() => {
     if (showLogSearch) {
       setTimeout(() => logSearchInputRef.current?.focus(), 50);
@@ -195,7 +195,6 @@ export function AccessControlAdmin() {
   const loadAccessLogs = async () => {
     try {
       setIsLoading(true);
-      // Pedimos 500 para tener todo el día en memoria y paginar en front
       const logs = await AccessApi.getAccessLogs({
         typeFilter,
         limit: 500,
@@ -270,20 +269,184 @@ export function AccessControlAdmin() {
       console.warn("Sin sucursal, no se busca");
       return;
     }
+    // 🆕 Si estamos esperando selección de huella, NO hacer la búsqueda manual
+    if (isFingerReaded || fingerprintProcessing || fingerprintSelection) return;
+
     const delayDebounce = setTimeout(() => {
       searchMembers();
     }, 300);
 
     return () => clearTimeout(delayDebounce);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchTerm, typeFilter, user?.idsucursal]);
+  }, [searchTerm, typeFilter, user?.idsucursal, isFingerReaded, fingerprintProcessing, fingerprintSelection]);
 
+  // ============================================
+  // 🆕 HUELLA → registro directo en backend
+  // ============================================
   useFingerprintIdentify({
-    onVerified: (data) => {
-      setSearchTerm(data);
+    onVerified: async (ci) => {
+      if (!user?.idsucursal || !user?.idusuario) {
+        toast({
+          title: "Error",
+          description: "Usuario o sucursal no identificados",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      setFingerprintProcessing(true);
       setIsFingerReaded(true);
+      // Ocultar resultados de búsqueda manual previa
+      setMembers([]);
+
+      try {
+        const res = await AccessApi.registerByFingerprint(
+          ci,
+          user.idsucursal,
+          user.idusuario
+        );
+
+        // Log creado → insertarlo de inmediato en la lista
+        if (res.log) {
+          prependLog(res.log);
+        }
+
+        switch (res.mode) {
+          case "client_auto":
+          case "employee": {
+            if (res.denied) {
+              toast({
+                title: "Acceso Denegado",
+                description: res.message,
+                variant: "destructive",
+              });
+            } else {
+              toast({
+                title:
+                  res.mode === "employee"
+                    ? res.isLate
+                      ? "Entrada Tardía"
+                      : "Registro de Empleado"
+                    : "Acceso Registrado",
+                description: res.message,
+                variant: res.isLate ? "destructive" : "default",
+              });
+            }
+
+            if (res.tieneDeuda && res.deudaInfo) {
+              setDeudaInfo({
+                memberName: res.memberName || "Cliente",
+                montoPendiente: res.deudaInfo.montoPendiente,
+                servicioNombre: res.deudaInfo.servicioNombre,
+              });
+              setTimeout(() => setShowDeudaDialog(true), 500);
+            }
+            break;
+          }
+
+          case "requires_selection": {
+            // Excepción: 2+ servicios → mostrar picker
+            if (res.services && res.services.length > 1) {
+              setFingerprintSelection({
+                memberId: res.memberId!,
+                memberName: res.memberName || "",
+                ci: res.ci || ci,
+                services: res.services,
+              });
+              toast({
+                title: "Seleccione un servicio",
+                description: res.message,
+              });
+            }
+            break;
+          }
+
+          case "denied":
+          case "not_found":
+          default: {
+            toast({
+              title:
+                res.mode === "not_found"
+                  ? "No encontrado"
+                  : "Acceso Denegado",
+              description: res.message,
+              variant: "destructive",
+            });
+          }
+        }
+      } catch (error: any) {
+        toast({
+          title: "Error",
+          description: error.message,
+          variant: "destructive",
+        });
+      } finally {
+        setFingerprintProcessing(false);
+        setIsFingerReaded(false);
+        setSearchTerm("");
+      }
     },
   });
+
+  // ============================================
+  // 🆕 Selección manual de servicio tras huella
+  // ============================================
+  const handleFingerprintServicePick = async (
+    service: AccessApi.FingerprintServiceOption
+  ) => {
+    if (!fingerprintSelection || !user?.idsucursal || !user?.idusuario) return;
+
+    const buttonId = `fingerprint-${fingerprintSelection.memberId}-${service.id}`;
+    if (isButtonLoading(buttonId)) return;
+
+    try {
+      startButtonLoading(buttonId);
+
+      const result: ClientAccessResponse =
+        await AccessApi.registerClientAccess(
+          parseInt(fingerprintSelection.memberId),
+          parseInt(service.id),
+          user.idsucursal,
+          user.idusuario
+        );
+
+      if (result.success) {
+        toast({
+          title: "Acceso Registrado",
+          description: `${fingerprintSelection.memberName} - ${service.name}. ${result.message}`,
+        });
+
+        if (result.tieneDeuda && result.deudaInfo) {
+          setDeudaInfo({
+            memberName: fingerprintSelection.memberName,
+            montoPendiente: result.deudaInfo.montoPendiente,
+            servicioNombre: result.deudaInfo.servicioNombre,
+          });
+          setTimeout(() => setShowDeudaDialog(true), 500);
+        }
+      } else {
+        toast({
+          title: "Acceso Denegado",
+          description: result.message,
+          variant: "destructive",
+        });
+      }
+
+      if (result.log) {
+        prependLog(result.log);
+      }
+
+      setFingerprintSelection(null);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      stopButtonLoading(buttonId);
+    }
+  };
 
   const startButtonLoading = (buttonId: string) => {
     setLoadingButtons((prev) => ({ ...prev, [buttonId]: true }));
@@ -552,16 +715,12 @@ export function AccessControlAdmin() {
         stopButtonLoading(buttonId);
       }
     } else if (member.memberType === "employee") {
-      // ============================================================
-      // 🔒 RESTRICCIÓN RE-ACTIVADA: empleados solo por huella
-      // ============================================================
       toast({
         title: "Acceso no permitido",
         description:
           "Los empleados solo pueden registrar acceso mediante huella digital",
         variant: "destructive",
       });
-      // ============================================================
     }
 
     setSelectedMember(null);
@@ -663,7 +822,6 @@ export function AccessControlAdmin() {
 
   return (
     <div className="space-y-4 md:space-y-6">
-      {/* Header */}
       <div>
         <h1 className="text-2xl md:text-3xl font-bold text-primary">
           Control de Acceso
@@ -688,7 +846,6 @@ export function AccessControlAdmin() {
         <CardContent className="px-3 md:px-6">
           {/* Filtros - Responsive */}
           <div className="flex flex-col gap-3 mb-4 md:mb-6">
-            {/* Buscador de miembros */}
             <div className="relative w-full">
               <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
               <Input
@@ -699,7 +856,6 @@ export function AccessControlAdmin() {
               />
             </div>
 
-            {/* Filtros de tipo + actualizar + lupa búsqueda de logs */}
             <div className="flex items-center gap-2 flex-wrap">
               <div className="flex gap-1.5 flex-1 min-w-0">
                 <Button
@@ -728,7 +884,6 @@ export function AccessControlAdmin() {
                 </Button>
               </div>
 
-              {/* Lupa búsqueda de registros */}
               <div className="flex items-center gap-1.5">
                 <Button
                   variant={showLogSearch ? "default" : "outline"}
@@ -767,6 +922,67 @@ export function AccessControlAdmin() {
             </div>
           </div>
 
+          {/* ============================================ */}
+          {/* 🆕 HUELLA EN PROCESO */}
+          {/* ============================================ */}
+          {fingerprintProcessing && (
+            <div className="mb-4 md:mb-6 p-3 md:p-4 border rounded-lg bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800 flex items-center gap-3">
+              <Fingerprint className="h-5 w-5 text-blue-600 animate-pulse flex-shrink-0" />
+              <div className="text-sm text-blue-800 dark:text-blue-200">
+                <strong>Huella detectada</strong> — registrando acceso...
+              </div>
+            </div>
+          )}
+
+          {/* ============================================ */}
+          {/* 🆕 SELECCIÓN DE SERVICIO TRAS HUELLA (2+ servicios) */}
+          {/* ============================================ */}
+          {fingerprintSelection && (
+            <div className="mb-4 md:mb-6 p-3 md:p-4 border-2 border-amber-300 dark:border-amber-700 rounded-lg bg-amber-50 dark:bg-amber-950/30">
+              <h3 className="text-sm font-semibold mb-3 flex items-center gap-2 text-amber-800 dark:text-amber-200">
+                <Fingerprint className="h-4 w-4" />
+                {fingerprintSelection.memberName} — Seleccione un servicio
+              </h3>
+              <div className="flex flex-wrap gap-2">
+                {fingerprintSelection.services.map((service) => {
+                  const buttonId = `fingerprint-${fingerprintSelection.memberId}-${service.id}`;
+                  const loading = isButtonLoading(buttonId);
+                  const expired = service.status === "expired";
+
+                  return (
+                    <Button
+                      key={service.id}
+                      size="sm"
+                      onClick={() => handleFingerprintServicePick(service)}
+                      disabled={loading}
+                      className={`text-xs ${
+                        expired
+                          ? "bg-rose-600 hover:bg-rose-700 text-white"
+                          : "bg-amber-500 hover:bg-amber-600 text-black"
+                      }`}
+                    >
+                      <Plus className="h-3 w-3 mr-1" />
+                      {loading
+                        ? "Procesando..."
+                        : `${service.name} (${
+                            service.visits === null ? "Ilimitado" : service.visits
+                          })${expired ? " (Vencido)" : ""}`}
+                    </Button>
+                  );
+                })}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setFingerprintSelection(null)}
+                  disabled={Object.values(loadingButtons).some(Boolean)}
+                  className="text-xs"
+                >
+                  Cancelar
+                </Button>
+              </div>
+            </div>
+          )}
+
           {/* Nota: empleados solo por huella */}
           {members.some((member) => member.memberType === "employee") && (
             <div className="mb-3 md:mb-4 p-2.5 md:p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs md:text-sm text-blue-700">
@@ -793,7 +1009,6 @@ export function AccessControlAdmin() {
                     key={member.id}
                     className="flex flex-col gap-3 p-3 bg-background rounded border"
                   >
-                    {/* Fila 1: Info + Botones alineados a la derecha */}
                     <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                       <div className="flex-1 min-w-0">
                         <div className="font-medium text-sm md:text-base">
@@ -868,7 +1083,6 @@ export function AccessControlAdmin() {
                           )}
                       </div>
 
-                      {/* Botones de servicio (alineados a la derecha en desktop) */}
                       <div className="flex flex-wrap gap-2 sm:justify-end sm:flex-shrink-0">
                         {member.memberType === "client" ? (
                           member.services.length > 0 ? (
@@ -912,9 +1126,6 @@ export function AccessControlAdmin() {
                             </Button>
                           )
                         ) : (
-                          // ============================================================
-                          // 🔒 EMPLEADOS: solo huella digital (botones deshabilitados)
-                          // ============================================================
                           <div className="flex flex-col gap-1 w-full sm:w-auto">
                             <div className="flex gap-2">
                               <Button
@@ -950,7 +1161,6 @@ export function AccessControlAdmin() {
                               Solo por huella digital
                             </div>
                           </div>
-                          // ============================================================
                         )}
                       </div>
                     </div>
@@ -960,15 +1170,18 @@ export function AccessControlAdmin() {
             </div>
           )}
 
-          {searchTerm.length > 0 && members.length === 0 && !isLoading && (
-            <div className="mb-4 md:mb-6 p-4 border rounded-lg bg-muted/50 text-center text-sm text-muted-foreground">
-              No se encontraron miembros con ese nombre o CI
-            </div>
-          )}
+          {searchTerm.length > 0 &&
+            members.length === 0 &&
+            !isLoading &&
+            !fingerprintProcessing &&
+            !fingerprintSelection && (
+              <div className="mb-4 md:mb-6 p-4 border rounded-lg bg-muted/50 text-center text-sm text-muted-foreground">
+                No se encontraron miembros con ese nombre o CI
+              </div>
+            )}
 
           {/* Tabla Desktop / Cards Mobile */}
           <div className="rounded-md border">
-            {/* Vista Desktop */}
             <div className="hidden md:block overflow-x-auto">
               <Table>
                 <TableHeader>
@@ -998,7 +1211,6 @@ export function AccessControlAdmin() {
                   ) : (
                     paginatedLogs.map((log) => {
                       const isDenied = log.status === "denied";
-                      // Solo el registro MÁS RECIENTE se pinta verde
                       const isMostRecent =
                         log.id === mostRecentLogId && log.status === "success";
                       const isSuccessHighlighted =
@@ -1104,7 +1316,6 @@ export function AccessControlAdmin() {
               </Table>
             </div>
 
-            {/* Vista Mobile - Cards */}
             <div className="md:hidden divide-y">
               {isLoading && accessLogs.length === 0 ? (
                 <div className="text-center py-6 text-sm text-muted-foreground">
@@ -1218,7 +1429,6 @@ export function AccessControlAdmin() {
             </div>
           </div>
 
-          {/* Paginación */}
           {filteredLogs.length > PAGE_SIZE && (
             <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-4">
               <div className="text-xs sm:text-sm text-muted-foreground">
@@ -1240,9 +1450,7 @@ export function AccessControlAdmin() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() =>
-                    setCurrentPage((p) => Math.max(1, p - 1))
-                  }
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                   disabled={currentPage === 1}
                   className="h-8"
                 >
@@ -1250,8 +1458,7 @@ export function AccessControlAdmin() {
                   <span className="hidden sm:inline ml-1">Anterior</span>
                 </Button>
                 <div className="text-xs sm:text-sm text-foreground px-2">
-                  Página{" "}
-                  <span className="font-medium">{currentPage}</span> de{" "}
+                  Página <span className="font-medium">{currentPage}</span> de{" "}
                   <span className="font-medium">{totalPages}</span>
                 </div>
                 <Button

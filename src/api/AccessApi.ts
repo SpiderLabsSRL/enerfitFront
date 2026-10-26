@@ -16,7 +16,7 @@ interface BackendAccessLog {
   tipo_persona: "cliente" | "empleado";
   persona_nombres?: string;
   persona_apellidos?: string;
-  persona_ci?: string;
+  persona_ci?: string; 
   servicio_nombre?: string;
 }
 
@@ -137,6 +137,61 @@ export interface ClientSubscription {
   price: number;
   isMultisucursal: boolean;
 }
+// ============================================
+// REGISTER BY FINGERPRINT (flujo automático)
+// ============================================
+export interface FingerprintServiceOption {
+  id: string;
+  name: string;
+  visits: number | null;
+  status: "active" | "expired";
+  expirationDate: string;
+  tipoServicio: string;
+  branchId: number;
+  multisucursal: boolean;
+}
+
+export interface FingerprintAccessResponse {
+  success: boolean;
+  mode: "client_auto" | "employee" | "requires_selection" | "denied" | "not_found";
+  message: string;
+  denied?: boolean;
+  isLate?: boolean;
+  isEarly?: boolean;
+  minutos?: number;
+  tieneDeuda?: boolean;
+  deudaInfo?: {
+    montoPendiente: number;
+    montoTotal: number;
+    servicioNombre: string;
+  } | null;
+  remainingVisits?: number | null;
+  log?: AccessLog | null;
+  memberName?: string;
+  ci?: string;
+  memberId?: string;
+  services?: FingerprintServiceOption[];
+}
+
+export const registerByFingerprint = async (
+  ci: string,
+  branchId: number,
+  userId: number
+): Promise<FingerprintAccessResponse> => {
+  try {
+    const response = await api.post<FingerprintAccessResponse>(
+      `/access/register/fingerprint`,
+      { ci, branchId, userId }
+    );
+    return response.data;
+  } catch (error: any) {
+    console.error("Error registering by fingerprint:", error);
+    throw new Error(
+      error.response?.data?.message ||
+        "No se pudo registrar el acceso por huella"
+    );
+  }
+};
 
 // ============================================
 // AXIOS INSTANCE
