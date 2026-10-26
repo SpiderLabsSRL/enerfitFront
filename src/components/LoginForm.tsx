@@ -1,5 +1,5 @@
-// src/components/auth/LoginForm.tsx
-import { useState, useEffect } from "react";
+// src/components/LoginForm.tsx
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useUser } from "@/contexts/UserContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,6 +9,9 @@ import { Label } from "@/components/ui/label";
 import { Eye, EyeOff, LogIn } from "lucide-react";
 import mutantLogo from "@/assets/mutant-logo.png";
 import { checkSuscripcion } from "@/api/suscripcionApi";
+import { loginWithFingerprint } from "@/api/loginapi";
+import { toast } from "@/hooks/use-toast";
+import { useFingerprintIdentify } from "@/hooks/useFingerprintIdentify";
 
 export function LoginForm() {
   const [username, setUsername] = useState("");
@@ -16,37 +19,111 @@ export function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
-  const { login } = useUser();
+  const { login } = useUser(); // Obtenemos también setUser o una función refresh si existe
   const navigate = useNavigate();
+  
+  const isTempUserSet = useRef(false);
 
-  // Verificar si ya está autenticado
+  // Verificar si ya está autenticado al entrar
   useEffect(() => {
     const token = sessionStorage.getItem("token");
     const userData = sessionStorage.getItem("userData");
 
     if (token && userData) {
-      console.log("Usuario ya autenticado, redirigiendo...");
       const user = JSON.parse(userData);
-
       if (user.rol === "admin") {
         navigate("/admin/sales", { replace: true });
-      } else if (
-        ["recepcionista", "entrenador", "limpieza"].includes(user.rol)
-      ) {
+      } else if (["recepcionista", "entrenador", "limpieza"].includes(user.rol)) {
         navigate("/admin/access", { replace: true });
-      } else if (user.rol === "cliente") {
-        navigate("/access", { replace: true });
       } else {
         navigate("/access", { replace: true });
       }
+      return;
     }
+
+    // 🆕 PARCHE PARA EL LECTOR DE HUELLA EN EL LOGIN:
+    // Inyectamos un usuario "fantasma" para que el hook no explote al leer idsucursal
+    if (!userData) {
+      sessionStorage.setItem(
+        "userData",
+        JSON.stringify({
+          idusuario: 0,
+          idpersona: 0,
+          username: "login-guest",
+          rol: "invitado",
+          userType: "empleado",
+          nombres: "Invitado",
+          apellidos: "",
+          idsucursal: 1, 
+        })
+      );
+      isTempUserSet.current = true;
+    }
+
+    return () => {
+      // Al salir del login, si seguimos siendo el usuario fantasma, lo borramos
+      if (isTempUserSet.current && !sessionStorage.getItem("token")) {
+        sessionStorage.removeItem("userData");
+      }
+    };
   }, [navigate]);
+
+  // 🆕 ESCUCHA DEL EVENTO GLOBAL DEL HOOK
+  useEffect(() => {
+    const handleFingerprintGlobal = async (e: any) => {
+      const ci = e.detail?.ci;
+      if (!ci || isLoading) return;
+
+      setIsLoading(true);
+      setError("");
+
+      try {
+        const success = await loginWithFingerprint(ci);
+
+        if (success) {
+          // Si loginWithFingerprint guarda el token y userData en sessionStorage...
+          // Forzamos una recarga completa de la página para que el UserContext 
+          // y el AdminLayout se inicialicen correctamente desde cero.
+          toast({
+            title: "Acceso por Huella",
+            description: `Autenticación exitosa. Redirigiendo...`,
+          });
+          
+          setTimeout(() => {
+            window.location.href = "/admin"; // Fuerza recarga total (soluciona el sidebar)
+          }, 500);
+          
+          return;
+        }
+      } catch (err: any) {
+        setError(err.message || "Error al autenticar por huella");
+        toast({
+          title: "Error de huella",
+          description: err.message,
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    window.addEventListener("fingerprint-verified", handleFingerprintGlobal);
+
+    return () => {
+      window.removeEventListener("fingerprint-verified", handleFingerprintGlobal);
+    };
+  }, [isLoading]);
+
+  // 🆕 LLAMAMOS AL HOOK (Esto enciende el hardware del lector)
+  useFingerprintIdentify({
+    onVerified: () => {
+      // El hook ya emite el evento "fingerprint-verified" globalmente.
+    },
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
     if (isLoading) return;
-
     if (!username.trim() || !password.trim()) {
       setError("Por favor, complete todos los campos");
       return;
@@ -56,148 +133,61 @@ export function LoginForm() {
     setError("");
 
     try {
-      console.log("Intentando login con usuario:", username);
-
-      // Verificar suscripción
       let suscripcionStatus;
       try {
         suscripcionStatus = await checkSuscripcion();
       } catch (suscripcionError: any) {
-        console.error("Error al verificar suscripción:", suscripcionError);
-
-        // ⭐ NUEVO: primero mostrar el mensaje real del backend si existe
-        const backendMessage =
-          suscripcionError.response?.data?.message ||
-          suscripcionError.response?.data?.error;
-
-        // Detectar error de conexión / timeout
-        const isConnectionError =
-          suscripcionError.message?.includes("Network Error") ||
-          suscripcionError.message?.includes("ERR_CONNECTION_REFUSED") ||
-          suscripcionError.message?.includes("ERR_CONNECTION_TIMED_OUT") ||
-          suscripcionError.message?.includes("ERR_INTERNET_DISCONNECTED") ||
-          suscripcionError.message?.includes("ECONNREFUSED") ||
-          suscripcionError.message?.includes("timeout") ||
-          suscripcionError.message?.includes("time out") ||
-          suscripcionError.message?.includes("timedout") ||
-          suscripcionError.code === "ECONNABORTED" ||
-          suscripcionError.code === "ERR_NETWORK" ||
-          suscripcionError.code === "ETIMEDOUT" ||
-          (suscripcionError.name === "AxiosError" &&
-            !suscripcionError.response);
-
+        const backendMessage = suscripcionError.response?.data?.message || suscripcionError.response?.data?.error;
+        const isConnectionError = suscripcionError.message?.includes("Network Error") || suscripcionError.code === "ECONNABORTED";
+        
         if (isConnectionError) {
-          console.log(
-            "Error de conexión o timeout detectado, redirigiendo a /error",
-          );
           navigate("/error", { replace: true });
           return;
         }
-
-        // Si el backend dio un mensaje específico, mostrarlo
         if (backendMessage) {
           setError(`Error del servidor: ${backendMessage}`);
           return;
         }
-
         throw suscripcionError;
       }
 
-      console.log("Estado de suscripción:", suscripcionStatus);
-
-      // Verificar si la suscripción está pagada
       if (suscripcionStatus && !suscripcionStatus.pagado) {
-        console.log("Suscripción no pagada, redirigiendo a /faltapago");
         navigate("/faltapago", { replace: true });
         return;
       }
 
-      // Proceder con el login
-      console.log("Suscripción OK, procediendo con login");
+      // Login manual
       const success = await login(username, password);
 
       if (success) {
-        console.log("Login exitoso, obteniendo userData...");
+        isTempUserSet.current = false;
         const userData = sessionStorage.getItem("userData");
-
         if (userData) {
           const user = JSON.parse(userData);
-          console.log("Usuario autenticado:", {
-            idusuario: user.idusuario,
-            rol: user.rol,
-            userType: user.userType,
-            idsucursal: user.idsucursal,
-            nombres: user.nombres,
-            apellidos: user.apellidos,
-          });
-
           if (user.rol === "admin") {
             navigate("/admin/sales", { replace: true });
-          } else if (
-            ["recepcionista", "entrenador", "limpieza"].includes(user.rol)
-          ) {
+          } else if (["recepcionista", "entrenador", "limpieza"].includes(user.rol)) {
             navigate("/admin/access", { replace: true });
-          } else if (user.rol === "cliente") {
-            navigate("/access", { replace: true });
           } else {
             navigate("/access", { replace: true });
           }
         } else {
-          console.error("No se encontró userData después del login exitoso");
           setError("Error al cargar datos del usuario");
         }
       } else {
         setError("Credenciales incorrectas");
       }
     } catch (err: any) {
-      console.error("Error en handleSubmit:", err);
-
-      // ⭐ NUEVO: mostrar mensaje del backend si existe
-      const backendMessage =
-        err.response?.data?.message || err.response?.data?.error;
-
-      const isConnectionError =
-        err.message?.includes("Network Error") ||
-        err.message?.includes("ERR_CONNECTION_REFUSED") ||
-        err.message?.includes("ERR_CONNECTION_TIMED_OUT") ||
-        err.message?.includes("ERR_INTERNET_DISCONNECTED") ||
-        err.message?.includes("ECONNREFUSED") ||
-        err.message?.includes("timeout") ||
-        err.message?.includes("time out") ||
-        err.message?.includes("timedout") ||
-        err.code === "ECONNABORTED" ||
-        err.code === "ERR_NETWORK" ||
-        err.code === "ETIMEDOUT" ||
-        (err.name === "AxiosError" && !err.response);
-
-      if (isConnectionError) {
-        console.log(
-          "Error de conexión o timeout detectado en catch principal, redirigiendo a /error",
-        );
-        navigate("/error", { replace: true });
-        return;
-      }
-
+      const backendMessage = err.response?.data?.message || err.response?.data?.error;
       if (backendMessage) {
         setError(`Error del servidor: ${backendMessage}`);
         return;
       }
-
-      if (
-        err.message?.includes("SUSCRIPCION_NO_PAGADA") ||
-        err.message?.includes("Acceso restringido: Suscripción no pagada") ||
-        err.message?.includes("suscripción no pagada") ||
-        err.message?.includes("cortado por falta de pago") ||
-        err.message?.includes("falta de pago")
-      ) {
+      if (err.message?.includes("SUSCRIPCION_NO_PAGADA") || err.message?.includes("falta de pago")) {
         navigate("/faltapago", { replace: true });
         return;
       }
-
-      setError(
-        err.message ||
-          "Error al iniciar sesión. Por favor, intenta nuevamente.",
-      );
+      setError(err.message || "Error al iniciar sesión.");
     } finally {
       setIsLoading(false);
     }
