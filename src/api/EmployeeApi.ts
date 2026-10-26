@@ -225,8 +225,24 @@ function extractErrorMessage(error: unknown, fallback: string): string {
 
 // ============================================
 // HELPER: Mapea el empleado del backend al frontend
+// + Sanity check para detectar respuestas inválidas
 // ============================================
 function mapBackendEmployee(employee: BackendEmployee): Employee {
+  // 🛡️ Sanity check: si el backend no devolvió id/persona_id,
+  //    fallamos rápido para no registrar huellas en el empleado equivocado.
+  if (
+    employee == null ||
+    employee.id == null ||
+    employee.persona_id == null ||
+    Number.isNaN(Number(employee.id)) ||
+    Number.isNaN(Number(employee.persona_id))
+  ) {
+    console.error("❌ BackendEmployee inválido (falta id o persona_id):", employee);
+    throw new Error(
+      "El servidor no devolvió un identificador válido del empleado. Contacte al administrador."
+    );
+  }
+
   return {
     id: employee.id,
     persona_id: employee.persona_id,

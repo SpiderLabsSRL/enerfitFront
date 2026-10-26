@@ -409,8 +409,14 @@ export function EmployeeManagement() {
   // EJECUTAR GUARDADO (después de confirmar)
   // ============================================
   const executeSave = async () => {
-    let personId = "";
+    // 🟢 FIX: usar el ID del EMPLEADO (no el persona_id)
+    //    porque el endpoint /employees/:id/register-fingerprint
+    //    espera un empleado_id.
+    let employeeIdToEnroll = "";
     setIsConfirming(true);
+
+    // ✅ Capturar ANTES de resetForm(), porque resetForm() lo vuelve a true
+    const shouldEnrollFingerprint = formData.registrarHuella;
 
     try {
       const horariosToSend: HorarioConSucursal[] = [];
@@ -452,19 +458,44 @@ export function EmployeeManagement() {
           editingEmployee.id,
           employeeRequest
         );
-        personId = updatedEmployee.persona_id.toString();
+        // 🟢 empleado_id (no persona_id)
+        employeeIdToEnroll = String(updatedEmployee.id);
         toast({
           title: "Éxito",
           description: "Trabajador actualizado correctamente",
         });
       } else {
         const newEmployee = await createEmployee(employeeRequest);
-        personId = newEmployee.persona_id.toString();
+        // 🟢 empleado_id (no persona_id)
+        employeeIdToEnroll = String(newEmployee.id);
         toast({
           title: "Éxito",
           description: "Trabajador registrado correctamente",
         });
       }
+
+      // 🛡️ Sanity check: si por algún motivo el backend no devolvió un id
+      //    válido, evitamos abrir el scanner con un id basura.
+      const idIsValid =
+        employeeIdToEnroll &&
+        employeeIdToEnroll !== "null" &&
+        employeeIdToEnroll !== "undefined" &&
+        employeeIdToEnroll !== "0" &&
+        !Number.isNaN(Number(employeeIdToEnroll));
+
+      if (!idIsValid) {
+        console.error(
+          "❌ ID de empleado inválido al intentar abrir el scanner:",
+          employeeIdToEnroll
+        );
+      }
+
+      // Log de trazabilidad (útil mientras depuras)
+      console.log("🟢 Empleado guardado:", {
+        empleado_id: employeeIdToEnroll,
+        modo: editingEmployee ? "update" : "create",
+        registrarHuella: shouldEnrollFingerprint,
+      });
 
       // ✅ Cerrar ambos diálogos SOLO cuando la operación tuvo éxito
       setIsDialogOpen(false);
@@ -472,11 +503,12 @@ export function EmployeeManagement() {
       resetForm();
       await loadData();
 
-      if (formData.registrarHuella && !editingEmployee) {
+      // ✅ Abrir scanner (crear Y editar) con el ID correcto
+      if (shouldEnrollFingerprint && idIsValid) {
         setIsScanning(true);
         setIsScannerOpen(true);
         setIsRegisteringFingerprint(true);
-        startEnroll(personId);
+        startEnroll(employeeIdToEnroll);
       }
     } catch (error: unknown) {
       let errorMessage = "Error al guardar el empleado";
@@ -495,7 +527,6 @@ export function EmployeeManagement() {
       });
 
       // ✅ En error cerramos el confirm, pero dejamos el form abierto
-      //    para que el usuario pueda corregir.
       setConfirmState({ open: false, action: null, employee: null });
     } finally {
       setIsConfirming(false);
@@ -515,7 +546,8 @@ export function EmployeeManagement() {
       cargo: employee.cargo,
       sucursal_id: employee.sucursal_id || 0,
       caja_id: employee.caja_id || 0,
-      registrarHuella: false,
+      // ✅ Si aún no tiene huella, sugerimos registrarla por defecto
+      registrarHuella: !employee.tieneHuella,
       usuario: employee.username || "",
       contraseña: "",
     });
@@ -799,7 +831,6 @@ export function EmployeeManagement() {
                           ...prev,
                           cargo: value,
                           caja_id: 0,
-                          // ✅ Conserva la sucursal si el nuevo rol la necesita
                           sucursal_id: necesitaSucursal
                             ? prev.sucursal_id || editingEmployee?.sucursal_id || 0
                             : 0,
@@ -1037,7 +1068,9 @@ export function EmployeeManagement() {
                   }
                 />
                 <Label htmlFor="registrarHuella" className="text-sm">
-                  Registrar huella dactilar ahora
+                  {editingEmployee
+                    ? "Actualizar huella dactilar ahora"
+                    : "Registrar huella dactilar ahora"}
                 </Label>
               </div>
             </div>
