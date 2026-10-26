@@ -30,6 +30,7 @@ import { ReporteServicios } from "./pages/admin/ReporteServicios";
 import { ReporteProductos } from "./pages/admin/ReporteProductos";
 import { ReporteEmpleados } from "./pages/admin/ReporteEmpleados";
 import { Cupones } from "./pages/admin/Cupones";
+import { Couch } from "./pages/admin/Couch";
 
 const queryClient = new QueryClient();
 
@@ -156,6 +157,7 @@ const AppRoutes = () => {
         <Route path="reporte-productos" element={<ReporteProductos />} />
         <Route path="reporte-empleados" element={<ReporteEmpleados />} />
         <Route path="employees" element={<EmployeeManagement />} />
+        <Route path="coaches" element={<Couch />} />
         <Route path="cupones" element={<Cupones />} />
       </Route>
 

@@ -32,6 +32,7 @@ import {
   ChevronLeft,
   PanelLeftClose,
   PanelLeftOpen,
+  Award,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -93,6 +94,12 @@ const mainSidebarItems: SidebarItem[] = [
     title: "Gestión de Trabajadores",
     icon: UserCog,
     path: "/admin/employees",
+    roles: ["admin"],
+  },
+  {
+    title: "Coaches",
+    icon: Award,
+    path: "/admin/coaches",
     roles: ["admin"],
   },
   {
