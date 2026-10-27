@@ -1,4 +1,4 @@
-// src/components/LoginForm.tsx
+// src/components/auth/LoginForm.tsx
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useUser } from "@/contexts/UserContext";
@@ -10,8 +10,8 @@ import { Eye, EyeOff, LogIn } from "lucide-react";
 import mutantLogo from "@/assets/mutant-logo.png";
 import { checkSuscripcion } from "@/api/suscripcionApi";
 import { loginWithFingerprint } from "@/api/loginapi";
-import { toast } from "@/hooks/use-toast";
 import { useFingerprintIdentify } from "@/hooks/useFingerprintIdentify";
+import { toast } from "@/hooks/use-toast";
 
 export function LoginForm() {
   const [username, setUsername] = useState("");
@@ -19,18 +19,20 @@ export function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
-  const { login } = useUser(); // Obtenemos también setUser o una función refresh si existe
+  const { login } = useUser();
   const navigate = useNavigate();
-  
+
   const isTempUserSet = useRef(false);
 
-  // Verificar si ya está autenticado al entrar
+  // Verificar si ya está autenticado
   useEffect(() => {
     const token = sessionStorage.getItem("token");
     const userData = sessionStorage.getItem("userData");
 
     if (token && userData) {
+      console.log("Usuario ya autenticado, redirigiendo...");
       const user = JSON.parse(userData);
+
       if (user.rol === "admin") {
         navigate("/admin/sales", { replace: true });
       } else if (["recepcionista", "entrenador", "limpieza"].includes(user.rol)) {
@@ -41,8 +43,10 @@ export function LoginForm() {
       return;
     }
 
-    // 🆕 PARCHE PARA EL LECTOR DE HUELLA EN EL LOGIN:
-    // Inyectamos un usuario "fantasma" para que el hook no explote al leer idsucursal
+    // 🆕 LIMPIAMOS TOKENS VIEJOS ANTES DE INYECTAR EL USUARIO FANTASMA
+    localStorage.removeItem("token");
+    sessionStorage.removeItem("token");
+
     if (!userData) {
       sessionStorage.setItem(
         "userData",
@@ -61,14 +65,13 @@ export function LoginForm() {
     }
 
     return () => {
-      // Al salir del login, si seguimos siendo el usuario fantasma, lo borramos
       if (isTempUserSet.current && !sessionStorage.getItem("token")) {
         sessionStorage.removeItem("userData");
       }
     };
   }, [navigate]);
 
-  // 🆕 ESCUCHA DEL EVENTO GLOBAL DEL HOOK
+  // 🆕 ESCUCHA DEL EVENTO GLOBAL DEL HOOK (HUELLA)
   useEffect(() => {
     const handleFingerprintGlobal = async (e: any) => {
       const ci = e.detail?.ci;
@@ -81,17 +84,15 @@ export function LoginForm() {
         const success = await loginWithFingerprint(ci);
 
         if (success) {
-          // Si loginWithFingerprint guarda el token y userData en sessionStorage...
-          // Forzamos una recarga completa de la página para que el UserContext 
-          // y el AdminLayout se inicialicen correctamente desde cero.
           toast({
             title: "Acceso por Huella",
             description: `Autenticación exitosa. Redirigiendo...`,
           });
           
+          // 🔥 Recargamos la página para asegurar que el UserContext y el Sidebar carguen bien
           setTimeout(() => {
-            window.location.href = "/admin"; // Fuerza recarga total (soluciona el sidebar)
-          }, 500);
+            window.location.replace("/admin"); 
+          }, 300);
           
           return;
         }
@@ -117,13 +118,15 @@ export function LoginForm() {
   // 🆕 LLAMAMOS AL HOOK (Esto enciende el hardware del lector)
   useFingerprintIdentify({
     onVerified: () => {
-      // El hook ya emite el evento "fingerprint-verified" globalmente.
+      // El hook emite el evento global, no hacemos nada aquí
     },
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
     if (isLoading) return;
+
     if (!username.trim() || !password.trim()) {
       setError("Por favor, complete todos los campos");
       return;
@@ -133,37 +136,56 @@ export function LoginForm() {
     setError("");
 
     try {
+      console.log("Intentando login con usuario:", username);
+
       let suscripcionStatus;
       try {
         suscripcionStatus = await checkSuscripcion();
       } catch (suscripcionError: any) {
-        const backendMessage = suscripcionError.response?.data?.message || suscripcionError.response?.data?.error;
-        const isConnectionError = suscripcionError.message?.includes("Network Error") || suscripcionError.code === "ECONNABORTED";
-        
+        console.error("Error al verificar suscripción:", suscripcionError);
+
+        const isConnectionError =
+          suscripcionError.message?.includes("Network Error") ||
+          suscripcionError.message?.includes("ERR_CONNECTION_REFUSED") ||
+          suscripcionError.message?.includes("ERR_CONNECTION_TIMED_OUT") ||
+          suscripcionError.message?.includes("ERR_INTERNET_DISCONNECTED") ||
+          suscripcionError.message?.includes("ECONNREFUSED") ||
+          suscripcionError.message?.includes("timeout") ||
+          suscripcionError.message?.includes("time out") ||
+          suscripcionError.message?.includes("timedout") ||
+          suscripcionError.code === "ECONNABORTED" ||
+          suscripcionError.code === "ERR_NETWORK" ||
+          suscripcionError.code === "ETIMEDOUT" ||
+          (suscripcionError.name === "AxiosError" && !suscripcionError.response) ||
+          (suscripcionError.name === "AxiosError" && suscripcionError.code === "ECONNABORTED");
+
         if (isConnectionError) {
           navigate("/error", { replace: true });
           return;
         }
-        if (backendMessage) {
-          setError(`Error del servidor: ${backendMessage}`);
-          return;
-        }
+
         throw suscripcionError;
       }
+
+      console.log("Estado de suscripción:", suscripcionStatus);
 
       if (suscripcionStatus && !suscripcionStatus.pagado) {
         navigate("/faltapago", { replace: true });
         return;
       }
 
-      // Login manual
+      console.log("Suscripción OK, procediendo con login");
       const success = await login(username, password);
 
       if (success) {
         isTempUserSet.current = false;
+        console.log("Login exitoso, obteniendo userData...");
         const userData = sessionStorage.getItem("userData");
+
         if (userData) {
           const user = JSON.parse(userData);
+          console.log("Usuario autenticado:", user);
+
           if (user.rol === "admin") {
             navigate("/admin/sales", { replace: true });
           } else if (["recepcionista", "entrenador", "limpieza"].includes(user.rol)) {
@@ -178,16 +200,43 @@ export function LoginForm() {
         setError("Credenciales incorrectas");
       }
     } catch (err: any) {
-      const backendMessage = err.response?.data?.message || err.response?.data?.error;
-      if (backendMessage) {
-        setError(`Error del servidor: ${backendMessage}`);
+      console.error("Error en handleSubmit:", err);
+
+      const isConnectionError =
+        err.message?.includes("Network Error") ||
+        err.message?.includes("ERR_CONNECTION_REFUSED") ||
+        err.message?.includes("ERR_CONNECTION_TIMED_OUT") ||
+        err.message?.includes("ERR_INTERNET_DISCONNECTED") ||
+        err.message?.includes("ECONNREFUSED") ||
+        err.message?.includes("timeout") ||
+        err.message?.includes("time out") ||
+        err.message?.includes("timedout") ||
+        err.code === "ECONNABORTED" ||
+        err.code === "ERR_NETWORK" ||
+        err.code === "ETIMEDOUT" ||
+        (err.name === "AxiosError" && !err.response) ||
+        (err.name === "AxiosError" && err.code === "ECONNABORTED");
+
+      if (isConnectionError) {
+        navigate("/error", { replace: true });
         return;
       }
-      if (err.message?.includes("SUSCRIPCION_NO_PAGADA") || err.message?.includes("falta de pago")) {
+
+      if (
+        err.message?.includes("SUSCRIPCION_NO_PAGADA") ||
+        err.message?.includes("Acceso restringido: Suscripción no pagada") ||
+        err.message?.includes("suscripción no pagada") ||
+        err.message?.includes("cortado por falta de pago") ||
+        err.message?.includes("falta de pago")
+      ) {
         navigate("/faltapago", { replace: true });
         return;
       }
-      setError(err.message || "Error al iniciar sesión.");
+
+      setError(
+        err.message ||
+          "Error al iniciar sesión. Por favor, intenta nuevamente.",
+      );
     } finally {
       setIsLoading(false);
     }
@@ -197,7 +246,7 @@ export function LoginForm() {
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <Card className="w-full max-w-md gym-card relative">
         <CardHeader className="text-center space-y-4">
-          <img src={mutantLogo} alt="ENERFIT" className="h-28 mx-auto" />
+          <img src={mutantLogo} alt="MUTANT Gym" className="h-16 mx-auto" />
           <CardTitle className="text-3xl font-bold text-primary">
             INICIAR SESIÓN
           </CardTitle>
@@ -259,7 +308,7 @@ export function LoginForm() {
             </div>
 
             {error && (
-              <div className="p-3 text-sm text-destructive bg-destructive/15 border border-destructive/50 rounded-md">
+              <div className="p-3 text-sm text-destructive bg-destructive/15 border border-destructive/50 rounded-md animate-pulse">
                 <strong>Error:</strong> {error}
               </div>
             )}

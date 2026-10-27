@@ -38,14 +38,16 @@ export const login = async (
   username: string,
   password: string,
 ): Promise<boolean> => {
+  localStorage.removeItem("token");
+  localStorage.removeItem("userData");
+  sessionStorage.removeItem("token");
+  sessionStorage.removeItem("userData");
+
   try {
     const response = await axios.post<LoginResponse>(
       `${API_URL}/login/login`,
       { username, password },
-      {
-        headers: { "Content-Type": "application/json" },
-        timeout: 10000,
-      },
+      { headers: { "Content-Type": "application/json" }, timeout: 10000 },
     );
 
     if (response.data.success === false) {
@@ -80,17 +82,20 @@ export const login = async (
 };
 
 // ============================================
-// 🆕 LOGIN POR HUELLA DACTILAR
+// 🆕 LOGIN POR HUELLA (Corregido)
 // ============================================
 export const loginWithFingerprint = async (ci: string): Promise<boolean> => {
+  // 🔥 LIMPIEZA CRUCIAL ANTES DE PEDIR EL NUEVO TOKEN
+  localStorage.removeItem("token");
+  localStorage.removeItem("userData");
+  sessionStorage.removeItem("token");
+  sessionStorage.removeItem("userData");
+
   try {
     const response = await axios.post<LoginResponse>(
       `${API_URL}/login/fingerprint`,
       { ci },
-      {
-        headers: { "Content-Type": "application/json" },
-        timeout: 10000,
-      },
+      { headers: { "Content-Type": "application/json" }, timeout: 10000 },
     );
 
     if (response.data.success === false) {
@@ -121,13 +126,10 @@ export const loginWithFingerprint = async (ci: string): Promise<boolean> => {
 
 export const verifyToken = async (token: string) => {
   try {
-    const response = await axios.get(
-      `${API_URL}/login/verify`,
-      {
-        headers: { Authorization: `Bearer ${token}` },
-        timeout: 5000,
-      },
-    );
+    const response = await axios.get(`${API_URL}/login/verify`, {
+      headers: { Authorization: `Bearer ${token}` },
+      timeout: 5000,
+    });
     return { isValid: response.data.success, user: response.data.user };
   } catch (error) {
     return { isValid: false };
@@ -135,6 +137,8 @@ export const verifyToken = async (token: string) => {
 };
 
 export const logout = (): void => {
+  localStorage.removeItem("token");
+  localStorage.removeItem("userData");
   sessionStorage.removeItem("token");
   sessionStorage.removeItem("userData");
 };
@@ -155,4 +159,20 @@ export const getStoredUserData = (): UserData | null => {
 
 export const getStoredToken = (): string | null => {
   return sessionStorage.getItem("token");
+};
+
+export const userHasSucursal = (user: UserData | null): boolean => {
+  if (!user) return false;
+  if (user.rol === "admin") return true;
+  if (user.userType === "empleado") return !!user.idsucursal;
+  return true;
+};
+
+export const getUserSucursalOrDefault = (user: UserData | null): string => {
+  if (!user) return "all";
+  if (user.rol === "admin") return "all";
+  if (user.userType === "empleado" && user.idsucursal) {
+    return user.idsucursal.toString();
+  }
+  return "all";
 };
