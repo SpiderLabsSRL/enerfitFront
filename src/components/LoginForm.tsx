@@ -1,5 +1,5 @@
 // src/components/auth/LoginForm.tsx
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useUser } from "@/contexts/UserContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,9 +9,6 @@ import { Label } from "@/components/ui/label";
 import { Eye, EyeOff, LogIn } from "lucide-react";
 import mutantLogo from "@/assets/mutant-logo.png";
 import { checkSuscripcion } from "@/api/suscripcionApi";
-import { loginWithFingerprint } from "@/api/loginapi";
-import { useFingerprintIdentify } from "@/hooks/useFingerprintIdentify";
-import { toast } from "@/hooks/use-toast";
 
 export function LoginForm() {
   const [username, setUsername] = useState("");
@@ -21,8 +18,6 @@ export function LoginForm() {
   const [error, setError] = useState("");
   const { login } = useUser();
   const navigate = useNavigate();
-
-  const isTempUserSet = useRef(false);
 
   // Verificar si ya está autenticado
   useEffect(() => {
@@ -35,92 +30,17 @@ export function LoginForm() {
 
       if (user.rol === "admin") {
         navigate("/admin/sales", { replace: true });
-      } else if (["recepcionista", "entrenador", "limpieza"].includes(user.rol)) {
+      } else if (
+        ["recepcionista", "entrenador", "limpieza"].includes(user.rol)
+      ) {
         navigate("/admin/access", { replace: true });
+      } else if (user.rol === "cliente") {
+        navigate("/access", { replace: true });
       } else {
         navigate("/access", { replace: true });
       }
-      return;
     }
-
-    // 🆕 LIMPIAMOS TOKENS VIEJOS ANTES DE INYECTAR EL USUARIO FANTASMA
-    localStorage.removeItem("token");
-    sessionStorage.removeItem("token");
-
-    if (!userData) {
-      sessionStorage.setItem(
-        "userData",
-        JSON.stringify({
-          idusuario: 0,
-          idpersona: 0,
-          username: "login-guest",
-          rol: "invitado",
-          userType: "empleado",
-          nombres: "Invitado",
-          apellidos: "",
-          idsucursal: 1, 
-        })
-      );
-      isTempUserSet.current = true;
-    }
-
-    return () => {
-      if (isTempUserSet.current && !sessionStorage.getItem("token")) {
-        sessionStorage.removeItem("userData");
-      }
-    };
   }, [navigate]);
-
-  // 🆕 ESCUCHA DEL EVENTO GLOBAL DEL HOOK (HUELLA)
-  useEffect(() => {
-    const handleFingerprintGlobal = async (e: any) => {
-      const ci = e.detail?.ci;
-      if (!ci || isLoading) return;
-
-      setIsLoading(true);
-      setError("");
-
-      try {
-        const success = await loginWithFingerprint(ci);
-
-        if (success) {
-          toast({
-            title: "Acceso por Huella",
-            description: `Autenticación exitosa. Redirigiendo...`,
-          });
-          
-          // 🔥 Recargamos la página para asegurar que el UserContext y el Sidebar carguen bien
-          setTimeout(() => {
-            window.location.replace("/admin"); 
-          }, 300);
-          
-          return;
-        }
-      } catch (err: any) {
-        setError(err.message || "Error al autenticar por huella");
-        toast({
-          title: "Error de huella",
-          description: err.message,
-          variant: "destructive",
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    window.addEventListener("fingerprint-verified", handleFingerprintGlobal);
-
-    return () => {
-      window.removeEventListener("fingerprint-verified", handleFingerprintGlobal);
-    };
-  }, [isLoading]);
-
-  // 🆕 LLAMAMOS AL HOOK (Esto enciende el hardware del lector)
-  useFingerprintIdentify({
-    onVerified: () => {
-      // El hook emite el evento global, no hacemos nada aquí
-    },
-  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -138,12 +58,19 @@ export function LoginForm() {
     try {
       console.log("Intentando login con usuario:", username);
 
+      // Verificar suscripción
       let suscripcionStatus;
       try {
         suscripcionStatus = await checkSuscripcion();
       } catch (suscripcionError: any) {
         console.error("Error al verificar suscripción:", suscripcionError);
 
+        // ⭐ NUEVO: primero mostrar el mensaje real del backend si existe
+        const backendMessage =
+          suscripcionError.response?.data?.message ||
+          suscripcionError.response?.data?.error;
+
+        // Detectar error de conexión / timeout
         const isConnectionError =
           suscripcionError.message?.includes("Network Error") ||
           suscripcionError.message?.includes("ERR_CONNECTION_REFUSED") ||
@@ -156,11 +83,20 @@ export function LoginForm() {
           suscripcionError.code === "ECONNABORTED" ||
           suscripcionError.code === "ERR_NETWORK" ||
           suscripcionError.code === "ETIMEDOUT" ||
-          (suscripcionError.name === "AxiosError" && !suscripcionError.response) ||
-          (suscripcionError.name === "AxiosError" && suscripcionError.code === "ECONNABORTED");
+          (suscripcionError.name === "AxiosError" &&
+            !suscripcionError.response);
 
         if (isConnectionError) {
+          console.log(
+            "Error de conexión o timeout detectado, redirigiendo a /error",
+          );
           navigate("/error", { replace: true });
+          return;
+        }
+
+        // Si el backend dio un mensaje específico, mostrarlo
+        if (backendMessage) {
+          setError(`Error del servidor: ${backendMessage}`);
           return;
         }
 
@@ -169,31 +105,45 @@ export function LoginForm() {
 
       console.log("Estado de suscripción:", suscripcionStatus);
 
+      // Verificar si la suscripción está pagada
       if (suscripcionStatus && !suscripcionStatus.pagado) {
+        console.log("Suscripción no pagada, redirigiendo a /faltapago");
         navigate("/faltapago", { replace: true });
         return;
       }
 
+      // Proceder con el login
       console.log("Suscripción OK, procediendo con login");
       const success = await login(username, password);
 
       if (success) {
-        isTempUserSet.current = false;
         console.log("Login exitoso, obteniendo userData...");
         const userData = sessionStorage.getItem("userData");
 
         if (userData) {
           const user = JSON.parse(userData);
-          console.log("Usuario autenticado:", user);
+          console.log("Usuario autenticado:", {
+            idusuario: user.idusuario,
+            rol: user.rol,
+            userType: user.userType,
+            idsucursal: user.idsucursal,
+            nombres: user.nombres,
+            apellidos: user.apellidos,
+          });
 
           if (user.rol === "admin") {
             navigate("/admin/sales", { replace: true });
-          } else if (["recepcionista", "entrenador", "limpieza"].includes(user.rol)) {
+          } else if (
+            ["recepcionista", "entrenador", "limpieza"].includes(user.rol)
+          ) {
             navigate("/admin/access", { replace: true });
+          } else if (user.rol === "cliente") {
+            navigate("/access", { replace: true });
           } else {
             navigate("/access", { replace: true });
           }
         } else {
+          console.error("No se encontró userData después del login exitoso");
           setError("Error al cargar datos del usuario");
         }
       } else {
@@ -201,6 +151,10 @@ export function LoginForm() {
       }
     } catch (err: any) {
       console.error("Error en handleSubmit:", err);
+
+      // ⭐ NUEVO: mostrar mensaje del backend si existe
+      const backendMessage =
+        err.response?.data?.message || err.response?.data?.error;
 
       const isConnectionError =
         err.message?.includes("Network Error") ||
@@ -214,11 +168,18 @@ export function LoginForm() {
         err.code === "ECONNABORTED" ||
         err.code === "ERR_NETWORK" ||
         err.code === "ETIMEDOUT" ||
-        (err.name === "AxiosError" && !err.response) ||
-        (err.name === "AxiosError" && err.code === "ECONNABORTED");
+        (err.name === "AxiosError" && !err.response);
 
       if (isConnectionError) {
+        console.log(
+          "Error de conexión o timeout detectado en catch principal, redirigiendo a /error",
+        );
         navigate("/error", { replace: true });
+        return;
+      }
+
+      if (backendMessage) {
+        setError(`Error del servidor: ${backendMessage}`);
         return;
       }
 
@@ -246,7 +207,7 @@ export function LoginForm() {
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <Card className="w-full max-w-md gym-card relative">
         <CardHeader className="text-center space-y-4">
-          <img src={mutantLogo} alt="MUTANT Gym" className="h-16 mx-auto" />
+          <img src={mutantLogo} alt="ENERFIT" className="h-28 mx-auto" />
           <CardTitle className="text-3xl font-bold text-primary">
             INICIAR SESIÓN
           </CardTitle>
@@ -308,7 +269,7 @@ export function LoginForm() {
             </div>
 
             {error && (
-              <div className="p-3 text-sm text-destructive bg-destructive/15 border border-destructive/50 rounded-md animate-pulse">
+              <div className="p-3 text-sm text-destructive bg-destructive/15 border border-destructive/50 rounded-md">
                 <strong>Error:</strong> {error}
               </div>
             )}
