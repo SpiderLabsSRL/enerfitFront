@@ -42,6 +42,7 @@ import {
   getBoxes,
   CARGOS,
   ROLES_CON_ACCESO,
+  ROLES_CON_CAJA,
   ROLES_SIN_HORARIO,
   DIAS_MAP,
   type Employee,
@@ -85,17 +86,14 @@ export function EmployeeManagement() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
 
-  // ✅ Estado para el diálogo de confirmación (crear / editar / eliminar)
   const [confirmState, setConfirmState] = useState<ConfirmState>({
     open: false,
     action: null,
     employee: null,
   });
 
-  // ✅ Bloquea los botones mientras se ejecuta la operación
   const [isConfirming, setIsConfirming] = useState(false);
 
-  // Estado para el modal de horarios
   const [horariosModalOpen, setHorariosModalOpen] = useState(false);
   const [horariosToShow, setHorariosToShow] = useState<HorarioVisualizacion[]>([]);
 
@@ -129,8 +127,12 @@ export function EmployeeManagement() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // ✅ CAMBIO: filtrar cajas por sucursal solo para roles que la requieren
   useEffect(() => {
-    if (formData.sucursal_id > 0 && formData.cargo === "recepcionista") {
+    if (
+      formData.sucursal_id > 0 &&
+      ROLES_CON_CAJA.includes(formData.cargo)
+    ) {
       const filtered = boxes.filter(
         (box) => box.sucursal_id === formData.sucursal_id && box.estado === 1
       );
@@ -354,19 +356,21 @@ export function EmployeeManagement() {
 
     if (!formData.cargo) errors.cargo = "El cargo es obligatorio";
 
-    if (
-      formData.cargo === "limpieza" ||
-      formData.cargo === "entrenador" ||
-      formData.cargo === "lactobar"
-    ) {
-      if (!formData.sucursal_id) errors.sucursal_id = "La sucursal es obligatoria";
+    // ✅ CAMBIO: todos los roles requieren sucursal
+    if (formData.cargo && !formData.sucursal_id) {
+      errors.sucursal_id = "La sucursal es obligatoria";
+    }
+
+    // ✅ CAMBIO: solo roles con horarios requieren horarios (admin NO)
+    if (formData.cargo && !ROLES_SIN_HORARIO.includes(formData.cargo)) {
       const tieneHorarios = horarios.some((dia) => dia.horarios.length > 0);
       if (!tieneHorarios) {
         errors.horarios = "Debe agregar al menos un horario";
       }
     }
 
-    if (formData.cargo === "recepcionista" && !formData.caja_id) {
+    // ✅ CAMBIO: admin y recepcionista requieren caja
+    if (ROLES_CON_CAJA.includes(formData.cargo) && !formData.caja_id) {
       errors.caja_id = "Debe seleccionar una caja";
     }
 
@@ -409,18 +413,15 @@ export function EmployeeManagement() {
   // EJECUTAR GUARDADO (después de confirmar)
   // ============================================
   const executeSave = async () => {
-    // 🟢 FIX: usar el ID del EMPLEADO (no el persona_id)
-    //    porque el endpoint /employees/:id/register-fingerprint
-    //    espera un empleado_id.
     let employeeIdToEnroll = "";
     setIsConfirming(true);
 
-    // ✅ Capturar ANTES de resetForm(), porque resetForm() lo vuelve a true
     const shouldEnrollFingerprint = formData.registrarHuella;
 
     try {
       const horariosToSend: HorarioConSucursal[] = [];
 
+      // ✅ CAMBIO: solo enviar horarios si el rol los requiere
       if (!ROLES_SIN_HORARIO.includes(formData.cargo)) {
         for (const dia of horarios) {
           for (const horario of dia.horarios) {
@@ -436,16 +437,17 @@ export function EmployeeManagement() {
         }
       }
 
+      // ✅ CAMBIO: admin envía sucursal + caja, sin horarios
       const employeeRequest: EmployeeRequest = {
         nombres: formData.nombres,
         apellidos: formData.apellidos,
         ci: formData.ci,
         telefono: formData.telefono,
         cargo: formData.cargo,
-        sucursal_id: ROLES_SIN_HORARIO.includes(formData.cargo)
-          ? null
-          : formData.sucursal_id,
-        caja_id: formData.cargo === "recepcionista" ? formData.caja_id : null,
+        sucursal_id: formData.sucursal_id || null,
+        caja_id: ROLES_CON_CAJA.includes(formData.cargo)
+          ? formData.caja_id || null
+          : null,
         horarios: horariosToSend,
         username: ROLES_CON_ACCESO.includes(formData.cargo)
           ? formData.usuario
@@ -458,7 +460,6 @@ export function EmployeeManagement() {
           editingEmployee.id,
           employeeRequest
         );
-        // 🟢 empleado_id (no persona_id)
         employeeIdToEnroll = String(updatedEmployee.id);
         toast({
           title: "Éxito",
@@ -466,7 +467,6 @@ export function EmployeeManagement() {
         });
       } else {
         const newEmployee = await createEmployee(employeeRequest);
-        // 🟢 empleado_id (no persona_id)
         employeeIdToEnroll = String(newEmployee.id);
         toast({
           title: "Éxito",
@@ -474,8 +474,6 @@ export function EmployeeManagement() {
         });
       }
 
-      // 🛡️ Sanity check: si por algún motivo el backend no devolvió un id
-      //    válido, evitamos abrir el scanner con un id basura.
       const idIsValid =
         employeeIdToEnroll &&
         employeeIdToEnroll !== "null" &&
@@ -490,20 +488,18 @@ export function EmployeeManagement() {
         );
       }
 
-      // Log de trazabilidad (útil mientras depuras)
       console.log("🟢 Empleado guardado:", {
         empleado_id: employeeIdToEnroll,
         modo: editingEmployee ? "update" : "create",
         registrarHuella: shouldEnrollFingerprint,
+        rol: formData.cargo,
       });
 
-      // ✅ Cerrar ambos diálogos SOLO cuando la operación tuvo éxito
       setIsDialogOpen(false);
       setConfirmState({ open: false, action: null, employee: null });
       resetForm();
       await loadData();
 
-      // ✅ Abrir scanner (crear Y editar) con el ID correcto
       if (shouldEnrollFingerprint && idIsValid) {
         setIsScanning(true);
         setIsScannerOpen(true);
@@ -526,7 +522,6 @@ export function EmployeeManagement() {
         variant: "destructive",
       });
 
-      // ✅ En error cerramos el confirm, pero dejamos el form abierto
       setConfirmState({ open: false, action: null, employee: null });
     } finally {
       setIsConfirming(false);
@@ -546,7 +541,6 @@ export function EmployeeManagement() {
       cargo: employee.cargo,
       sucursal_id: employee.sucursal_id || 0,
       caja_id: employee.caja_id || 0,
-      // ✅ Si aún no tiene huella, sugerimos registrarla por defecto
       registrarHuella: !employee.tieneHuella,
       usuario: employee.username || "",
       contraseña: "",
@@ -585,7 +579,7 @@ export function EmployeeManagement() {
   };
 
   // ============================================
-  // ELIMINAR (abre el diálogo de confirmación)
+  // ELIMINAR
   // ============================================
   const confirmDelete = (employee: Employee) => {
     setConfirmState({
@@ -622,7 +616,7 @@ export function EmployeeManagement() {
   };
 
   // ============================================
-  // CONFIRMAR ACCIÓN (dispatch)
+  // CONFIRMAR ACCIÓN
   // ============================================
   const handleConfirmAction = async () => {
     if (confirmState.action === "create" || confirmState.action === "update") {
@@ -674,9 +668,6 @@ export function EmployeeManagement() {
     );
   }
 
-  // ============================================
-  // TÍTULOS Y DESCRIPCIONES DEL DIÁLOGO DE CONFIRMACIÓN
-  // ============================================
   const getConfirmTitle = () => {
     if (confirmState.action === "create") return "¿Registrar nuevo trabajador?";
     if (confirmState.action === "update") return "¿Guardar cambios?";
@@ -826,14 +817,13 @@ export function EmployeeManagement() {
                     <Select
                       value={formData.cargo}
                       onValueChange={(value) => {
-                        const necesitaSucursal = value !== "admin";
+                        // ✅ CAMBIO: todos los cargos requieren sucursal
                         setFormData((prev) => ({
                           ...prev,
                           cargo: value,
                           caja_id: 0,
-                          sucursal_id: necesitaSucursal
-                            ? prev.sucursal_id || editingEmployee?.sucursal_id || 0
-                            : 0,
+                          sucursal_id:
+                            prev.sucursal_id || editingEmployee?.sucursal_id || 0,
                         }));
                       }}
                     >
@@ -853,157 +843,160 @@ export function EmployeeManagement() {
                     )}
                   </div>
 
-                  {!ROLES_SIN_HORARIO.includes(formData.cargo) &&
-                    formData.cargo !== "" && (
-                      <div className="grid gap-1">
-                        <Label>
-                          Sucursal <span className="text-red-500">*</span>
-                        </Label>
-                        <Select
-                          value={formData.sucursal_id.toString()}
-                          onValueChange={(v) =>
-                            setFormData((prev) => ({
-                              ...prev,
-                              sucursal_id: parseInt(v),
-                              caja_id: 0,
-                            }))
-                          }
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Seleccionar" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {branches.map((b) => (
-                              <SelectItem key={b.id} value={b.id.toString()}>
-                                {b.nombre}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        {formErrors.sucursal_id && (
-                          <p className="text-xs text-destructive">
-                            {formErrors.sucursal_id}
-                          </p>
-                        )}
-                      </div>
-                    )}
+                  {/* ✅ CAMBIO: sucursal siempre visible (todos la requieren) */}
+                  {formData.cargo !== "" && (
+                    <div className="grid gap-1">
+                      <Label>
+                        Sucursal <span className="text-red-500">*</span>
+                      </Label>
+                      <Select
+                        value={formData.sucursal_id.toString()}
+                        onValueChange={(v) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            sucursal_id: parseInt(v),
+                            caja_id: 0,
+                          }))
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Seleccionar" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {branches.map((b) => (
+                            <SelectItem key={b.id} value={b.id.toString()}>
+                              {b.nombre}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {formErrors.sucursal_id && (
+                        <p className="text-xs text-destructive">
+                          {formErrors.sucursal_id}
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
 
-                {formData.cargo === "recepcionista" && formData.sucursal_id > 0 && (
-                  <div className="grid gap-2">
-                    <Label>
-                      Caja asignada <span className="text-red-500">*</span>
-                    </Label>
-                    <Select
-                      value={formData.caja_id.toString()}
-                      onValueChange={(v) =>
-                        setFormData((prev) => ({ ...prev, caja_id: parseInt(v) }))
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccionar caja" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {filteredBoxes.length === 0 ? (
-                          <SelectItem value="0" disabled>
-                            No hay cajas disponibles
-                          </SelectItem>
-                        ) : (
-                          filteredBoxes.map((box) => (
-                            <SelectItem key={box.id} value={box.id.toString()}>
-                              {box.nombre}
+                {/* ✅ CAMBIO: caja visible para admin y recepcionista */}
+                {ROLES_CON_CAJA.includes(formData.cargo) &&
+                  formData.sucursal_id > 0 && (
+                    <div className="grid gap-2">
+                      <Label>
+                        Caja asignada <span className="text-red-500">*</span>
+                      </Label>
+                      <Select
+                        value={formData.caja_id.toString()}
+                        onValueChange={(v) =>
+                          setFormData((prev) => ({ ...prev, caja_id: parseInt(v) }))
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Seleccionar caja" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {filteredBoxes.length === 0 ? (
+                            <SelectItem value="0" disabled>
+                              No hay cajas disponibles
                             </SelectItem>
-                          ))
-                        )}
-                      </SelectContent>
-                    </Select>
-                    {formErrors.caja_id && (
-                      <p className="text-xs text-destructive">{formErrors.caja_id}</p>
+                          ) : (
+                            filteredBoxes.map((box) => (
+                              <SelectItem key={box.id} value={box.id.toString()}>
+                                {box.nombre}
+                              </SelectItem>
+                            ))
+                          )}
+                        </SelectContent>
+                      </Select>
+                      {formErrors.caja_id && (
+                        <p className="text-xs text-destructive">{formErrors.caja_id}</p>
+                      )}
+                    </div>
+                  )}
+              </div>
+
+              {/* ✅ CAMBIO: horarios visibles SOLO para roles que los requieren (admin NO) */}
+              {formData.cargo !== "" &&
+                !ROLES_SIN_HORARIO.includes(formData.cargo) && (
+                  <div className="space-y-4 p-3 bg-muted/30 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Clock className="h-4 w-4 text-primary" />
+                        <Label className="text-sm font-semibold">
+                          Horarios de Trabajo
+                        </Label>
+                      </div>
+                    </div>
+
+                    {horarios.map((dia) => (
+                      <div key={dia.dia_semana} className="border rounded-lg p-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <Label className="font-medium">{dia.dia_nombre}</Label>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => addHorarioToDay(dia.dia_semana)}
+                          >
+                            <Plus className="h-3 w-3 mr-1" /> Agregar
+                          </Button>
+                        </div>
+
+                        {dia.horarios.map((horario) => (
+                          <div
+                            key={horario.id}
+                            className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2 items-end"
+                          >
+                            <div>
+                              <Label className="text-xs">Ingreso</Label>
+                              <TimePicker
+                                value={horario.hora_ingreso}
+                                onChange={(v) =>
+                                  handleHorarioChange(
+                                    dia.dia_semana,
+                                    horario.id,
+                                    "hora_ingreso",
+                                    v
+                                  )
+                                }
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-xs">Salida</Label>
+                              <TimePicker
+                                value={horario.hora_salida}
+                                onChange={(v) =>
+                                  handleHorarioChange(
+                                    dia.dia_semana,
+                                    horario.id,
+                                    "hora_salida",
+                                    v
+                                  )
+                                }
+                              />
+                            </div>
+                            <div>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() =>
+                                  removeHorarioFromDay(dia.dia_semana, horario.id)
+                                }
+                              >
+                                <X className="h-4 w-4 text-red-500" />
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                    {formErrors.horarios && (
+                      <p className="text-xs text-destructive">{formErrors.horarios}</p>
                     )}
                   </div>
                 )}
-              </div>
-
-              {/* Horarios */}
-              {!ROLES_SIN_HORARIO.includes(formData.cargo) && formData.cargo !== "" && (
-                <div className="space-y-4 p-3 bg-muted/30 rounded-lg">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Clock className="h-4 w-4 text-primary" />
-                      <Label className="text-sm font-semibold">
-                        Horarios de Trabajo
-                      </Label>
-                    </div>
-                  </div>
-
-                  {horarios.map((dia) => (
-                    <div key={dia.dia_semana} className="border rounded-lg p-3">
-                      <div className="flex items-center justify-between mb-2">
-                        <Label className="font-medium">{dia.dia_nombre}</Label>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => addHorarioToDay(dia.dia_semana)}
-                        >
-                          <Plus className="h-3 w-3 mr-1" /> Agregar
-                        </Button>
-                      </div>
-
-                      {dia.horarios.map((horario) => (
-                        <div
-                          key={horario.id}
-                          className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2 items-end"
-                        >
-                          <div>
-                            <Label className="text-xs">Ingreso</Label>
-                            <TimePicker
-                              value={horario.hora_ingreso}
-                              onChange={(v) =>
-                                handleHorarioChange(
-                                  dia.dia_semana,
-                                  horario.id,
-                                  "hora_ingreso",
-                                  v
-                                )
-                              }
-                            />
-                          </div>
-                          <div>
-                            <Label className="text-xs">Salida</Label>
-                            <TimePicker
-                              value={horario.hora_salida}
-                              onChange={(v) =>
-                                handleHorarioChange(
-                                  dia.dia_semana,
-                                  horario.id,
-                                  "hora_salida",
-                                  v
-                                )
-                              }
-                            />
-                          </div>
-                          <div>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={() =>
-                                removeHorarioFromDay(dia.dia_semana, horario.id)
-                              }
-                            >
-                              <X className="h-4 w-4 text-red-500" />
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ))}
-                  {formErrors.horarios && (
-                    <p className="text-xs text-destructive">{formErrors.horarios}</p>
-                  )}
-                </div>
-              )}
 
               {/* Datos de Acceso */}
               {ROLES_CON_ACCESO.includes(formData.cargo) && (
@@ -1270,11 +1263,9 @@ export function EmployeeManagement() {
                     <TableCell>{employee.ci}</TableCell>
                     <TableCell>{employee.telefono}</TableCell>
                     <TableCell className="capitalize">{employee.cargo}</TableCell>
+                    <TableCell>{employee.sucursal || "-"}</TableCell>
                     <TableCell>
-                      {employee.cargo === "admin" ? "N/A" : employee.sucursal || "-"}
-                    </TableCell>
-                    <TableCell>
-                      {employee.cargo === "recepcionista"
+                      {ROLES_CON_CAJA.includes(employee.cargo)
                         ? formatCajaDisplay(employee)
                         : "N/A"}
                     </TableCell>
@@ -1431,11 +1422,9 @@ export function EmployeeManagement() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Sucursal:</span>
-                  <span>
-                    {employee.cargo === "admin" ? "N/A" : employee.sucursal || "-"}
-                  </span>
+                  <span>{employee.sucursal || "-"}</span>
                 </div>
-                {employee.cargo === "recepcionista" && (
+                {ROLES_CON_CAJA.includes(employee.cargo) && (
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Caja:</span>
                     <span>{formatCajaDisplay(employee)}</span>
@@ -1490,7 +1479,7 @@ export function EmployeeManagement() {
         )}
       </div>
 
-      {/* ✅ Diálogo de confirmación unificado (crear / editar / eliminar) */}
+      {/* Diálogo de confirmación unificado */}
       <AlertDialog
         open={confirmState.open}
         onOpenChange={(open) => {

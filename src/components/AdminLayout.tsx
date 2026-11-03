@@ -1,3 +1,4 @@
+// src/components/AdminLayout.tsx
 import { useState, useEffect, useRef } from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import {
@@ -319,6 +320,9 @@ export function AdminLayout() {
   const location = useLocation();
   const { user, logout } = useUser();
 
+  // ✅ CAMBIO: helper para saber si el usuario actual es staff operativo (admin o recepcionista)
+  const isStaffOperativo = ["admin", "recepcionista"].includes(user?.rol ?? "");
+
   // ✅ Determinar si estamos en la vista de Control de Acceso
   const isAccessView = location.pathname.startsWith("/admin/access");
 
@@ -359,28 +363,23 @@ export function AdminLayout() {
     }
   }, [location.pathname]);
 
-  // ✅ Activar el lector de huella globalmente para recepcionistas
-  //    - Deshabilitado en /admin/access
-  //    - Deshabilitado cuando fingerprintPaused === true (para enrolar sin conflicto)
+  // ✅ CAMBIO: Activar el lector de huella globalmente para admin Y recepcionista
   useFingerprintIdentify({
     onVerified: () => {
       // El trabajo real lo hace el listener global de 'fingerprint-verified'
     },
-    enabled:
-      user?.rol === "recepcionista" &&
-      !isAccessView &&
-      !fingerprintPaused,
+    enabled: isStaffOperativo && !isAccessView && !fingerprintPaused,
   });
 
   // ✅ Log para confirmar el estado
   useEffect(() => {
     console.log(
       "🎛️ [AdminLayout] Estado SSE identify:",
-      user?.rol === "recepcionista" && !isAccessView && !fingerprintPaused
+      isStaffOperativo && !isAccessView && !fingerprintPaused
         ? "ACTIVO"
         : "PAUSADO"
     );
-  }, [user?.rol, isAccessView, fingerprintPaused]);
+  }, [isStaffOperativo, isAccessView, fingerprintPaused]);
 
   // ============================================
   // LISTENER GLOBAL DE HUELLA (SEGUNDO PLANO)
@@ -389,7 +388,8 @@ export function AdminLayout() {
   const processingRef = useRef<boolean>(false);
 
   useEffect(() => {
-    if (user?.rol !== "recepcionista") return;
+    // ✅ CAMBIO: admin y recepcionista
+    if (!isStaffOperativo) return;
     if (!user?.idsucursal || !user?.idusuario) return;
     if (location.pathname.startsWith("/admin/access")) return;
 
@@ -422,7 +422,7 @@ export function AdminLayout() {
     return () => {
       window.removeEventListener("fingerprint-verified", handler);
     };
-  }, [user?.rol, user?.idsucursal, user?.idusuario, location.pathname]);
+  }, [isStaffOperativo, user?.idsucursal, user?.idusuario, location.pathname]);
 
   const handleLogout = () => {
     logout();
@@ -436,7 +436,9 @@ export function AdminLayout() {
     window.open(url, "_blank");
   };
 
+  // ✅ CAMBIO CLAVE: el admin ve TODOS los items sin filtro de roles
   const filterItemsByRole = (items: SidebarItem[]) => {
+    if (user?.rol === "admin") return items;
     return items.filter(
       (item) => !item.roles || (user && item.roles.includes(user.rol))
     );
@@ -447,6 +449,32 @@ export function AdminLayout() {
   const filteredReportsItems = filterItemsByRole(reportsSubmenuItems);
 
   const getCurrentItems = () => {
+    const todosItems = [...filteredMainItems, ...filteredAdditionalItems];
+
+    // ✅ CAMBIO: orden personalizado para admin (incluye TODAS las opciones)
+    if (user?.rol === "admin") {
+      const ordenAdmin = [
+        "Control de Acceso",
+        "Inscribir",
+        "Pagos Pendientes",
+        "Lista de Miembros",
+        "Servicios",
+        "Productos",
+        "Vender Producto",
+        "Control de Ventas",
+        "Nueva Transacción",
+        "Caja",
+        "Cupones",
+        "Gestión de Trabajadores",
+        "Coaches",
+        "Reportes",
+        "Recordatorios",
+      ];
+      return ordenAdmin
+        .map((titulo) => todosItems.find((item) => item.title === titulo))
+        .filter((item): item is SidebarItem => item !== undefined);
+    }
+
     if (user?.rol === "recepcionista") {
       const ordenRecepcionista = [
         "Control de Acceso",
@@ -458,14 +486,12 @@ export function AdminLayout() {
         "Control de Ventas",
         "Nueva Transacción",
       ];
-
-      const todosItems = [...filteredMainItems, ...filteredAdditionalItems];
       return ordenRecepcionista
         .map((titulo) => todosItems.find((item) => item.title === titulo))
         .filter((item): item is SidebarItem => item !== undefined);
     }
 
-    return [...filteredMainItems, ...filteredAdditionalItems];
+    return todosItems;
   };
 
   const currentItems = getCurrentItems();
@@ -862,7 +888,8 @@ export function AdminLayout() {
         </main>
       </div>
 
-      {user?.rol === "recepcionista" && location.pathname !== "/admin/sell" && (
+      {/* ✅ CAMBIO: botón flotante "Vender Producto" también para admin */}
+      {isStaffOperativo && location.pathname !== "/admin/sell" && (
         <>
           <div
             className={`

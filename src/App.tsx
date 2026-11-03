@@ -1,3 +1,4 @@
+// src/App.tsx
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -80,8 +81,10 @@ const RoleBasedRedirect = () => {
       user.rol === "admin" ||
       user.rol === "recepcionista" ||
       user.rol === "entrenador" ||
-      user.rol === "limpieza"
+      user.rol === "limpieza" ||
+      user.rol === "lactobar"
     ) {
+      // ✅ CAMBIO: admin y recepcionista van a /admin/access
       return <Navigate to="/admin/access" replace />;
     } else if (user.userType === "cliente" || user.rol === "cliente") {
       return <Navigate to="/access" replace />;
@@ -97,7 +100,8 @@ const RoleBasedRedirect = () => {
         user.rol === "admin" ||
         user.rol === "recepcionista" ||
         user.rol === "entrenador" ||
-        user.rol === "limpieza"
+        user.rol === "limpieza" ||
+        user.rol === "lactobar"
       ) {
         return <Navigate to="/admin/access" replace />;
       } else if (user.userType === "cliente" || user.rol === "cliente") {

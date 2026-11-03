@@ -121,14 +121,55 @@ const api = axios.create({
   },
 });
 
+// ✅ CAMBIO: preferir sessionStorage (sesión activa); fallback a localStorage
 api.interceptors.request.use((config) => {
   const token =
-    localStorage.getItem("token") || sessionStorage.getItem("token");
+    sessionStorage.getItem("token") || localStorage.getItem("token");
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
 });
+
+// ✅ NUEVO: manejo global de 401
+let isRedirectingToLogin = false;
+
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      const msg =
+        error.response.data?.message ||
+        error.response.data?.error ||
+        "Sesión expirada";
+
+      console.warn("🔒 Sesión expirada:", msg);
+
+      sessionStorage.removeItem("token");
+      sessionStorage.removeItem("userData");
+      localStorage.removeItem("token");
+
+      if (
+        typeof window !== "undefined" &&
+        !window.location.pathname.startsWith("/login") &&
+        !isRedirectingToLogin
+      ) {
+        isRedirectingToLogin = true;
+        try {
+          sessionStorage.setItem(
+            "redirect_after_login",
+            window.location.pathname + window.location.search
+          );
+        } catch {
+          /* noop */
+        }
+        window.location.replace("/login");
+      }
+    }
+
+    return Promise.reject(error);
+  }
+);
 
 // ============================================
 // HELPER: Aplica sucursal forzada si no es admin
@@ -323,6 +364,11 @@ export const getSales = async (
       error.response?.data || error.message
     );
 
+    // ✅ Mensaje claro cuando la sesión expiró
+    if (error.response?.status === 401) {
+      throw new Error("Tu sesión ha expirado. Inicia sesión nuevamente.");
+    }
+
     if (error.response?.status === 400) {
       throw new Error(error.response.data.error || "Parámetros inválidos");
     }
@@ -419,12 +465,17 @@ export const getSucursales = async (): Promise<Sucursal[]> => {
       error.response?.data || error.message
     );
 
+    // ✅ Mensaje claro cuando la sesión expiró
+    if (error.response?.status === 401) {
+      throw new Error("Tu sesión ha expirado. Inicia sesión nuevamente.");
+    }
+
     throw new Error("No se pudieron cargar las sucursales");
   }
 };
 
 // ============================================
-// ✅ ANULAR VENTA
+// ANULAR VENTA
 // ============================================
 export const anularVenta = async (
   saleId: string,

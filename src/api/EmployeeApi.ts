@@ -1,3 +1,4 @@
+// src/api/EmployeeApi.ts
 import axios from "axios";
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
@@ -144,9 +145,21 @@ export const CARGOS = [
 ] as const;
 
 export const ROLES_CON_ACCESO = ["admin", "recepcionista"];
+
+// ✅ CAMBIO: admin NO tiene horarios; el resto SÍ
 export const ROLES_SIN_HORARIO = ["admin"];
-export const ROLES_SIN_CAJA = [
+
+// ✅ CAMBIO: nadie está exento de caja (todos los roles pueden tenerla),
+//    pero solo admin y recepcionista la REQUIEREN
+export const ROLES_SIN_CAJA: string[] = [];
+
+// ✅ NUEVO: roles que requieren caja obligatoria
+export const ROLES_CON_CAJA = ["admin", "recepcionista"];
+
+// ✅ NUEVO: roles que requieren sucursal obligatoria (todos en este sistema)
+export const ROLES_CON_SUCURSAL = [
   "admin",
+  "recepcionista",
   "entrenador",
   "limpieza",
   "lactobar",
@@ -182,6 +195,56 @@ const api = axios.create({
     "Content-Type": "application/json",
   },
 });
+
+// ✅ CAMBIO: request interceptor — preferir sessionStorage, con fallback
+api.interceptors.request.use((config) => {
+  const token =
+    sessionStorage.getItem("token") || localStorage.getItem("token");
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+// ✅ NUEVO: response interceptor — manejo global de 401
+let isRedirectingToLogin = false;
+
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      const msg =
+        error.response.data?.message ||
+        error.response.data?.error ||
+        "Sesión expirada";
+
+      console.warn("🔒 Sesión expirada:", msg);
+
+      sessionStorage.removeItem("token");
+      sessionStorage.removeItem("userData");
+      localStorage.removeItem("token");
+
+      if (
+        typeof window !== "undefined" &&
+        !window.location.pathname.startsWith("/login") &&
+        !isRedirectingToLogin
+      ) {
+        isRedirectingToLogin = true;
+        try {
+          sessionStorage.setItem(
+            "redirect_after_login",
+            window.location.pathname + window.location.search
+          );
+        } catch {
+          /* noop */
+        }
+        window.location.replace("/login");
+      }
+    }
+
+    return Promise.reject(error);
+  }
+);
 
 // ============================================
 // HELPER: Extrae un mensaje legible de cualquier error de Axios
@@ -225,11 +288,8 @@ function extractErrorMessage(error: unknown, fallback: string): string {
 
 // ============================================
 // HELPER: Mapea el empleado del backend al frontend
-// + Sanity check para detectar respuestas inválidas
 // ============================================
 function mapBackendEmployee(employee: BackendEmployee): Employee {
-  // 🛡️ Sanity check: si el backend no devolvió id/persona_id,
-  //    fallamos rápido para no registrar huellas en el empleado equivocado.
   if (
     employee == null ||
     employee.id == null ||
@@ -282,7 +342,9 @@ export const getBranches = async (): Promise<Branch[]> => {
     }));
   } catch (error) {
     console.error("Error fetching branches:", error);
-    throw new Error(extractErrorMessage(error, "No se pudieron cargar las sucursales"));
+    throw new Error(
+      extractErrorMessage(error, "No se pudieron cargar las sucursales")
+    );
   }
 };
 
@@ -297,7 +359,9 @@ export const getBoxes = async (): Promise<Box[]> => {
     }));
   } catch (error) {
     console.error("Error fetching boxes:", error);
-    throw new Error(extractErrorMessage(error, "No se pudieron cargar las cajas"));
+    throw new Error(
+      extractErrorMessage(error, "No se pudieron cargar las cajas")
+    );
   }
 };
 
@@ -307,7 +371,9 @@ export const getEmployees = async (): Promise<Employee[]> => {
     return response.data.map((employee) => mapBackendEmployee(employee));
   } catch (error) {
     console.error("Error fetching employees:", error);
-    throw new Error(extractErrorMessage(error, "No se pudieron cargar los empleados"));
+    throw new Error(
+      extractErrorMessage(error, "No se pudieron cargar los empleados")
+    );
   }
 };
 
@@ -351,7 +417,9 @@ export const deleteEmployee = async (id: number): Promise<void> => {
     await api.delete(`/${id}`);
   } catch (error) {
     console.error("Error deleting employee:", error);
-    throw new Error(extractErrorMessage(error, "No se pudo eliminar el empleado"));
+    throw new Error(
+      extractErrorMessage(error, "No se pudo eliminar el empleado")
+    );
   }
 };
 
