@@ -145,12 +145,7 @@ const additionalSidebarItems: SidebarItem[] = [
     path: "/admin/pending",
     roles: ["recepcionista"],
   },
-  {
-    title: "Recordatorios",
-    icon: MessageSquare,
-    path: "/admin/reminders",
-    roles: ["recepcionista"],
-  },
+
   {
     title: "Vender Producto",
     icon: ShoppingCart,
