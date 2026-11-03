@@ -70,7 +70,8 @@ interface PersonValidationState {
   action: "replace" | "future" | null;
   startDate: Date | null;
   isPending: boolean;
-  /** Indica que la fecha fue fijada por una regla (replace/future) y NO es editable */
+  /** Indica que la fecha fue fijada por una regla (replace/future) y NO es editable
+   *  para recepcionistas. Para admin es editable igual (pero se marca visualmente). */
   isDateLocked: boolean;
 }
 
@@ -79,7 +80,8 @@ interface PersonDateAssignment {
   personName: string;
   startDate: Date | null;
   endDate: Date | null;
-  /** Si es true, no se le pedirá fecha ni se podrá editar después */
+  /** Si es true, no se le pedirá fecha ni se podrá editar después
+   *  (solo aplica a recepcionistas; admin siempre puede editar) */
   dateLocked: boolean;
 }
 
@@ -266,7 +268,7 @@ export function RegisterMember() {
     Record<number, Record<string, { startDate: Date; endDate: Date }>>
   >({});
   const [lockedServiceIds, setLockedServiceIds] = useState<number[]>([]);
-  /** NUEVO: personas con fecha bloqueada por servicio (no editables) */
+  /** NUEVO: personas con fecha bloqueada por servicio (no editables para recepcionista) */
   const [lockedPersonDates, setLockedPersonDates] = useState<
     Record<number, string[]>
   >({});
@@ -353,6 +355,9 @@ export function RegisterMember() {
   const [editPersonTempDate, setEditPersonTempDate] = useState<Date>(new Date());
 
   const { toast } = useToast();
+
+  // ✅ CAMBIO: admin puede editar fechas fijadas automáticamente
+  const isAdmin = user?.rol === "admin";
 
   const { startEnroll, cancelEnroll } = useFingerprintEnroll({
     onSuccess: () => {
@@ -705,7 +710,6 @@ export function RegisterMember() {
     const algunaConActiva = validations.some((v) => v.activeSubscription);
 
     if (algunaConActiva) {
-      // Primero resolvemos las validaciones (replace/future)
       setPendingValidations(validations);
       const firstPending = validations.findIndex(
         (v) => v.activeSubscription && v.action === null
@@ -716,13 +720,11 @@ export function RegisterMember() {
       return;
     }
 
-    // Si nadie tiene suscripción activa, vamos directo al flujo de fechas
     startGroupDateAssignmentFlow(service, personsForService, validations);
   };
 
   // ============================================
   // Flujo de asignación de fechas por persona
-  // Solo se pide fecha a quienes NO tienen fecha bloqueada por replace/future
   // ============================================
   const startGroupDateAssignmentFlow = (
     service: Service,
@@ -731,7 +733,8 @@ export function RegisterMember() {
   ) => {
     const assignments: PersonDateAssignment[] = persons.map((p, i) => {
       const base = baseValidations[i];
-      const locked = base?.action === "replace" || base?.action === "future";
+      // ✅ CAMBIO: solo bloqueamos si NO es admin
+      const locked = !isAdmin && (base?.action === "replace" || base?.action === "future");
       const startDate = base?.startDate ?? null;
       return {
         personKey: p._key,
@@ -742,12 +745,12 @@ export function RegisterMember() {
       };
     });
 
-    // Índices de personas que aún necesitan fecha manual
+    // ✅ CAMBIO: solo pedimos fecha a quienes NO tienen fecha fija (o si es admin,
+    //    pedimos fecha a TODOS los que no tengan startDate)
     const pendingIndexes = assignments
       .map((a, idx) => (a.dateLocked ? -1 : idx))
       .filter((idx) => idx !== -1);
 
-    // Si nadie necesita fecha (todas bloqueadas), terminamos de una vez
     if (pendingIndexes.length === 0) {
       finishGroupDateAssignment({
         service,
@@ -773,7 +776,8 @@ export function RegisterMember() {
   const handleGroupDateConfirm = () => {
     if (!groupDateFlow) return;
 
-    if (!isDateInAllowedRange(groupDateTemp)) {
+    // ✅ CAMBIO: admin puede elegir cualquier fecha
+    if (!isAdmin && !isDateInAllowedRange(groupDateTemp)) {
       toast({
         title: "⚠️ Fecha fuera de rango",
         description:
@@ -831,7 +835,8 @@ export function RegisterMember() {
         startDate: a.startDate,
         endDate: a.endDate,
       };
-      if (a.dateLocked) {
+      // ✅ CAMBIO: para admin NUNCA se marca como locked
+      if (a.dateLocked && !isAdmin) {
         newLockedPersons.push(a.personKey);
       }
     }
@@ -846,7 +851,6 @@ export function RegisterMember() {
       [service.idServicio]: newLockedPersons,
     }));
 
-    // serviceDates general con la primera fecha disponible
     const first = assignments.find((a) => a.startDate && a.endDate);
     if (first && first.startDate && first.endDate) {
       setServiceDates((prev) => ({
@@ -860,9 +864,8 @@ export function RegisterMember() {
 
     setSelectedServices((prev) => [...prev, service]);
 
-    // Bloqueamos el serviceId completo si TODAS las personas tienen fecha fija
-    // (no editable desde el panel general)
-    const allLocked = assignments.every((a) => a.dateLocked);
+    // ✅ CAMBIO: para admin NUNCA se bloquea el serviceId completo
+    const allLocked = !isAdmin && assignments.every((a) => a.dateLocked);
     if (allLocked) {
       setLockedServiceIds((prev) => [...prev, service.idServicio]);
     }
@@ -888,17 +891,15 @@ export function RegisterMember() {
     const updatedValidations = [...pendingValidations];
 
     if (action === "replace") {
-      // Reemplazar: la fecha es HOY, ya queda bloqueada (no editable)
       updatedValidations[currentValidationIndex] = {
         ...currentValidation,
         action: "replace",
         startDate: startOfToday(),
         isPending: false,
-        isDateLocked: true,
+        // ✅ CAMBIO: solo bloqueado para no-admin
+        isDateLocked: !isAdmin,
       };
     } else if (action === "future") {
-      // Programar futuro: la fecha es el día siguiente al vencimiento,
-      // ya queda bloqueada (no editable). NO se pide confirmación.
       if (!currentValidation.activeSubscription) return;
       const finActiva = new Date(
         currentValidation.activeSubscription.fechaVencimiento
@@ -911,19 +912,17 @@ export function RegisterMember() {
         action: "future",
         startDate: finActiva,
         isPending: false,
-        isDateLocked: true,
+        // ✅ CAMBIO: solo bloqueado para no-admin
+        isDateLocked: !isAdmin,
       };
     }
 
     setPendingValidations(updatedValidations);
 
-    // Buscar la siguiente validación pendiente (solo las que tienen activeSubscription y action null)
     const nextIndex = findNextPendingIndex(updatedValidations);
     if (nextIndex !== -1) {
       setCurrentValidationIndex(nextIndex);
     } else {
-      // Todas las validaciones resueltas → pasamos al flujo de fechas
-      // (que solo preguntará por quienes NO tengan fecha bloqueada)
       if (pendingGroupService) {
         startGroupDateAssignmentFlow(
           pendingGroupService.service,
@@ -938,7 +937,8 @@ export function RegisterMember() {
     const currentValidation = pendingValidations[currentValidationIndex];
     if (!currentValidation) return;
 
-    if (!isDateInAllowedRange(tempCalendarDate)) {
+    // ✅ CAMBIO: admin sin restricción de rango
+    if (!isAdmin && !isDateInAllowedRange(tempCalendarDate)) {
       toast({
         title: "⚠️ Fecha fuera de rango",
         description:
@@ -1076,10 +1076,12 @@ export function RegisterMember() {
       finActiva.setDate(finActiva.getDate() + 1);
       finActiva.setHours(0, 0, 0, 0);
       startDate = finActiva;
-      lockPerson = true;
+      // ✅ CAMBIO: solo bloqueamos a no-admin
+      lockPerson = !isAdmin;
     } else {
       startDate = startOfToday();
-      lockPerson = true;
+      // ✅ CAMBIO: solo bloqueamos a no-admin
+      lockPerson = !isAdmin;
     }
 
     const endDate = computeEndDate(tempServiceForValidation, startDate);
@@ -1096,12 +1098,12 @@ export function RegisterMember() {
     }));
     setSelectedServices((prev) => [...prev, tempServiceForValidation]);
 
-    setLockedServiceIds((prev) => [
-      ...prev,
-      tempServiceForValidation.idServicio,
-    ]);
-
+    // ✅ CAMBIO: para admin NO se bloquea el serviceId
     if (lockPerson) {
+      setLockedServiceIds((prev) => [
+        ...prev,
+        tempServiceForValidation.idServicio,
+      ]);
       setLockedPersonDates((prev) => ({
         ...prev,
         [tempServiceForValidation.idServicio]: [
@@ -1161,6 +1163,8 @@ export function RegisterMember() {
     serviceId: number,
     personKey: string
   ): boolean => {
+    // ✅ CAMBIO: admin NUNCA ve fechas bloqueadas
+    if (isAdmin) return false;
     return (lockedPersonDates[serviceId] || []).includes(personKey);
   };
 
@@ -1196,7 +1200,8 @@ export function RegisterMember() {
   const handleEditPersonDateConfirm = () => {
     if (!editingPersonDate) return;
 
-    if (!isDateInAllowedRange(editPersonTempDate)) {
+    // ✅ CAMBIO: admin sin restricción de rango
+    if (!isAdmin && !isDateInAllowedRange(editPersonTempDate)) {
       toast({
         title: "⚠️ Fecha fuera de rango",
         description:
@@ -1482,8 +1487,6 @@ export function RegisterMember() {
         };
       });
 
-      // ✅ FIX: Enviar montoEntregado y montoPendiente correctamente
-      //    para que el backend sepa cuánto ingresar a caja.
       const registrationData = {
         personas: personasPayload,
         servicios: serviciosPayload,
@@ -1769,6 +1772,7 @@ export function RegisterMember() {
             )}
             renderPersonDates={renderPersonDatesInServiceCard}
             lockedServiceIds={lockedServiceIds}
+            isAdmin={isAdmin}
           />
         </div>
 
@@ -2211,10 +2215,7 @@ export function RegisterMember() {
         </div>
       </div>
 
-      {/* ============================================================
-          Modal de asignación de fechas por persona (solo para las que
-          NO tienen fecha bloqueada por replace/future)
-         ============================================================ */}
+      {/* Modal de asignación de fechas por persona */}
       <Dialog
         open={showGroupDateDialog}
         onOpenChange={(open) => {
@@ -2246,10 +2247,12 @@ export function RegisterMember() {
                         <p className="font-semibold text-foreground mt-3">
                           {currentPerson?.personName}
                         </p>
-                        <p className="text-xs text-orange-500 mt-1">
-                          Solo puede seleccionar fechas desde 1 semana atrás
-                          hasta 1 semana en el futuro
-                        </p>
+                        {!isAdmin && (
+                          <p className="text-xs text-orange-500 mt-1">
+                            Solo puede seleccionar fechas desde 1 semana atrás
+                            hasta 1 semana en el futuro
+                          </p>
+                        )}
 
                         <div className="mt-4 space-y-2">
                           <Popover
@@ -2279,7 +2282,7 @@ export function RegisterMember() {
                                   }
                                 }}
                                 disabled={(date: Date) =>
-                                  !isDateInAllowedRange(date)
+                                  !isAdmin && !isDateInAllowedRange(date)
                                 }
                                 locale={es}
                                 initialFocus
@@ -2349,10 +2352,12 @@ export function RegisterMember() {
                     <p className="font-semibold text-foreground mt-2">
                       {editingPersonDate.personName}
                     </p>
-                    <p className="text-xs text-orange-500 mt-1">
-                      Solo puede seleccionar fechas desde 1 semana atrás hasta 1
-                      semana en el futuro
-                    </p>
+                    {!isAdmin && (
+                      <p className="text-xs text-orange-500 mt-1">
+                        Solo puede seleccionar fechas desde 1 semana atrás hasta
+                        1 semana en el futuro
+                      </p>
+                    )}
                     <div className="mt-4 space-y-2">
                       <Popover
                         open={showEditPersonCalendar}
@@ -2381,7 +2386,7 @@ export function RegisterMember() {
                               }
                             }}
                             disabled={(date: Date) =>
-                              !isDateInAllowedRange(date)
+                              !isAdmin && !isDateInAllowedRange(date)
                             }
                             locale={es}
                             initialFocus
@@ -2488,10 +2493,12 @@ export function RegisterMember() {
                         <p className="mt-2">
                           Seleccione la fecha de inicio para este servicio:
                         </p>
-                        <p className="text-xs text-orange-500 mt-1">
-                          Solo puede seleccionar fechas desde 1 semana atrás
-                          hasta 1 semana en el futuro
-                        </p>
+                        {!isAdmin && (
+                          <p className="text-xs text-orange-500 mt-1">
+                            Solo puede seleccionar fechas desde 1 semana atrás
+                            hasta 1 semana en el futuro
+                          </p>
+                        )}
                         <div className="mt-4">
                           <Popover
                             open={showTempCalendar}
@@ -2520,7 +2527,7 @@ export function RegisterMember() {
                                   }
                                 }}
                                 disabled={(date: Date) =>
-                                  !isDateInAllowedRange(date)
+                                  !isAdmin && !isDateInAllowedRange(date)
                                 }
                                 locale={es}
                                 initialFocus

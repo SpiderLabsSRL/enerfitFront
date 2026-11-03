@@ -37,6 +37,7 @@ interface ServiceSelectionProps {
   requiredPersonsForPlan?: number;
   renderPersonDates?: (service: Service) => React.ReactNode;
   lockedServiceIds?: number[];
+  isAdmin?: boolean; // ✅ NUEVO
 }
 
 // ============================================
@@ -74,6 +75,7 @@ export default function ServiceSelection({
   requiredPersonsForPlan = 0,
   renderPersonDates,
   lockedServiceIds = [],
+  isAdmin = false, // ✅ NUEVO
 }: ServiceSelectionProps) {
   const [refreshKey, setRefreshKey] = useState(0);
   const [prevPersonId, setPrevPersonId] = useState(selectedPersonId);
@@ -276,6 +278,9 @@ export default function ServiceSelection({
   };
 
   const isDateDisabledForNormalSelection = (date: Date): boolean => {
+    // ✅ CAMBIO: admin puede seleccionar cualquier fecha sin restricción
+    if (isAdmin) return false;
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const d = new Date(date);
@@ -512,7 +517,7 @@ export default function ServiceSelection({
                             </div>
                           </div>
                         </div>
-                        {!isDateLocked && (
+                        {!isDateLocked && !isAdmin && (
                           <p className="text-xs text-muted-foreground">
                             Puede seleccionar fechas desde 1 semana atrás hasta
                             1 semana en el futuro
