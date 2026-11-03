@@ -259,7 +259,6 @@ const MemberServices: React.FC<{
         const lowEntries = hasLowEntries(service.ingresos_disponibles);
         const noEntries = hasNoEntries(service.ingresos_disponibles);
         const isInactive = service.status === "inactive";
-        // ✅ AHORA: permite editar siempre que canEdit sea true (sin bloquear por inactivo)
         const canEditThisService = canEdit && !!onEditDates;
 
         return (
@@ -282,7 +281,6 @@ const MemberServices: React.FC<{
                   </div>
                 </div>
               </div>
-              {/* ✅ AHORA se muestra siempre que canEdit sea true */}
               {canEditThisService && (
                 <Button
                   variant="ghost"
@@ -328,7 +326,7 @@ const MemberCard: React.FC<{
   getSucursalName: (id: string) => string;
   onEdit: () => void;
   onEditServiceDates?: (service: Service) => void;
-  onDelete: () => void;
+  onDelete?: () => void;  // ✅ ahora opcional (solo admin)
   loading: boolean;
   canEditDates: boolean;
 }> = ({ member, getSucursalName, onEdit, onEditServiceDates, onDelete, loading, canEditDates }) => {
@@ -398,16 +396,19 @@ const MemberCard: React.FC<{
             <Edit className="h-4 w-4 mr-1" />
             Editar
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onDelete}
-            disabled={loading}
-            className="flex-1 text-red-600 hover:text-red-700 hover:bg-red-50"
-          >
-            <Trash2 className="h-4 w-4 mr-1" />
-            Eliminar
-          </Button>
+          {/* ✅ Botón eliminar SOLO si onDelete está definido (admin) */}
+          {onDelete && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onDelete}
+              disabled={loading}
+              className="flex-1 text-red-600 hover:text-red-700 hover:bg-red-50"
+            >
+              <Trash2 className="h-4 w-4 mr-1" />
+              Eliminar
+            </Button>
+          )}
         </div>
       </CardContent>
     </Card>
@@ -460,7 +461,8 @@ export function MembersList() {
   const { toast } = useToast();
   const userData = getStoredUserData();
   const dataInitialized = useRef(false);
-  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // ✅ FIX: usar ReturnType<typeof setTimeout> en lugar de NodeJS.Timeout
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const isEditingRef = useRef(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -469,6 +471,9 @@ export function MembersList() {
   // ✅ Permiso unificado: admin Y recepcionista pueden editar fechas
   const canEditDates =
     userData?.rol === "admin" || userData?.rol === "recepcionista";
+
+  // ✅ NUEVO: solo admin puede eliminar miembros
+  const canDeleteMembers = userData?.rol === "admin";
 
   const { startEnroll } = useFingerprintEnroll({
     onSuccess: (data) => {
@@ -721,7 +726,6 @@ export function MembersList() {
 
   // Abrir diálogo para editar fechas de un servicio
   const handleEditServiceDates = (member: Member, service: Service) => {
-    // ✅ Ya NO se bloquea por servicio inactivo: admin/recepcionista pueden editar
     setSelectedMember(member);
     setServiceToEditDates(service);
     setEditServiceDatesData({
@@ -773,6 +777,16 @@ export function MembersList() {
 
   // Manejar eliminación de miembro
   const handleDelete = async () => {
+    // ✅ Solo admin puede eliminar
+    if (!canDeleteMembers) {
+      toast({
+        title: "No autorizado",
+        description: "Solo un administrador puede eliminar miembros.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (!memberToDelete) return;
 
     try {
@@ -1239,19 +1253,22 @@ export function MembersList() {
                           >
                             <Edit className="h-4 w-4" />
                           </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => {
-                              setMemberToDelete(member.id);
-                              setDeleteDialogOpen(true);
-                            }}
-                            title="Eliminar"
-                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                            disabled={loading}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          {/* ✅ Botón eliminar SOLO admin */}
+                          {canDeleteMembers && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => {
+                                setMemberToDelete(member.id);
+                                setDeleteDialogOpen(true);
+                              }}
+                              title="Eliminar"
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                              disabled={loading}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -1301,10 +1318,11 @@ export function MembersList() {
               getSucursalName={getSucursalName}
               onEdit={() => handleEditMember(member)}
               onEditServiceDates={canEditDates ? (service) => handleEditServiceDates(member, service) : undefined}
-              onDelete={() => {
+              // ✅ Solo admin recibe handler de eliminar
+              onDelete={canDeleteMembers ? () => {
                 setMemberToDelete(member.id);
                 setDeleteDialogOpen(true);
-              }}
+              } : undefined}
               loading={loading}
               canEditDates={canEditDates}
             />
