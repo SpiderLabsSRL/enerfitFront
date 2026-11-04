@@ -64,6 +64,7 @@ import {
   Eye,
   Check,
   X,
+  Building2,
 } from "lucide-react";
 import {
   getCoaches,
@@ -72,14 +73,17 @@ import {
   deleteCoach,
   toggleCoachStatus,
   upsertRegistroMes,
-  getRegistroMes,
-  inscritosDelMes,
-  ultimosMeses,
+  getRegistrosMes,
+  getInscritosCoach,
   mesActual,
   formatMes,
+  ultimosMeses,
   type Coach,
   type CoachCreateRequest,
+  type RegistroMes,
+  type Inscrito,
 } from "@/api/CouchApi";
+import { getBranches, type Branch } from "@/api/EmployeeApi";
 
 // ============================================
 // TIPOS LOCALES
@@ -96,22 +100,29 @@ const emptyForm = {
   apellidos: "",
   ci: "",
   telefono: "",
+  sucursal_id: 0,
   metaInscritos: 10,
 };
 
 export function Couch() {
   const [coaches, setCoaches] = useState<Coach[]>([]);
+  const [branches, setBranches] = useState<Branch[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [mesSel, setMesSel] = useState<string>(mesActual());
 
-  // Form crear / editar coach
+  // Cache: registros por coach
+  const [registrosPorCoach, setRegistrosPorCoach] = useState<
+    Record<number, RegistroMes[]>
+  >({});
+
+  // Form crear / editar
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingCoach, setEditingCoach] = useState<Coach | null>(null);
   const [formData, setFormData] = useState(emptyForm);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
-  const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
+  const [updatingStatus, setUpdatingStatus] = useState<number | null>(null);
   const [confirmState, setConfirmState] = useState<ConfirmState>({
     open: false,
     action: null,
@@ -119,17 +130,19 @@ export function Couch() {
   });
   const [isConfirming, setIsConfirming] = useState(false);
 
-  // Estado de edición inline del adelanto
-  const [adelantoEditingId, setAdelantoEditingId] = useState<string | null>(
+  // Edición inline del adelanto
+  const [adelantoEditingId, setAdelantoEditingId] = useState<number | null>(
     null
   );
   const [adelantoInput, setAdelantoInput] = useState<string>("");
-  const [savingAdelantoId, setSavingAdelantoId] = useState<string | null>(null);
+  const [savingAdelantoId, setSavingAdelantoId] = useState<number | null>(null);
   const adelantoInputRef = useRef<HTMLInputElement>(null);
 
-  // Modal OJO (resumen)
+  // Modal de resumen
   const [viewModalOpen, setViewModalOpen] = useState(false);
   const [coachVer, setCoachVer] = useState<Coach | null>(null);
+  const [inscritosVer, setInscritosVer] = useState<Inscrito[]>([]);
+  const [loadingInscritos, setLoadingInscritos] = useState(false);
 
   // Paginación
   const [currentPage, setCurrentPage] = useState(1);
@@ -140,15 +153,38 @@ export function Couch() {
   // ============================================
   // CARGA
   // ============================================
-  const loadData = async () => {
+  const loadData = async (mes: string = mesSel) => {
     try {
       setIsLoading(true);
-      const data = await getCoaches();
-      setCoaches(data);
-    } catch {
+      const [coachesData, branchesData] = await Promise.all([
+        getCoaches(mes),
+        getBranches(),
+      ]);
+      setCoaches(coachesData);
+      setBranches(branchesData);
+
+      // Cargar registros (metas/adelantos) de cada coach
+      const entries = await Promise.all(
+        coachesData.map<Promise<[number, RegistroMes[]]>>(async (c) => {
+          try {
+            const regs = await getRegistrosMes(c.id);
+            return [c.id, regs];
+          } catch {
+            return [c.id, []];
+          }
+        })
+      );
+
+      const map: Record<number, RegistroMes[]> = {};
+      entries.forEach(([id, regs]) => {
+        map[id] = regs;
+      });
+      setRegistrosPorCoach(map);
+    } catch (e) {
       toast({
         title: "Error",
-        description: "No se pudieron cargar los coaches",
+        description:
+          e instanceof Error ? e.message : "No se pudieron cargar los coaches",
         variant: "destructive",
       });
     } finally {
@@ -161,10 +197,12 @@ export function Couch() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Al cambiar de mes, cierra cualquier edición inline abierta
+  // Al cambiar de mes → recargar (los stats cambian) y cerrar edición inline
   useEffect(() => {
     setAdelantoEditingId(null);
     setAdelantoInput("");
+    loadData(mesSel);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mesSel]);
 
   // ============================================
@@ -172,12 +210,11 @@ export function Couch() {
   // ============================================
   const mesesSelector = useMemo(() => {
     const set = new Set<string>(ultimosMeses(12));
-    coaches.forEach((c) => {
-      c.registrosMes.forEach((r) => set.add(r.mes));
-      c.inscritos.forEach((i) => set.add(i.mes));
-    });
+    Object.values(registrosPorCoach).forEach((regs) =>
+      regs.forEach((r) => set.add(r.mes))
+    );
     return Array.from(set).sort((a, b) => b.localeCompare(a));
-  }, [coaches]);
+  }, [registrosPorCoach]);
 
   // ============================================
   // FILTRADO + PAGINACIÓN
@@ -207,7 +244,15 @@ export function Couch() {
   }, [totalPages, currentPage]);
 
   // ============================================
-  // FORM CREAR / EDITAR COACH
+  // HELPERS
+  // ============================================
+  const getRegistro = (coachId: number): RegistroMes | null => {
+    const regs = registrosPorCoach[coachId] || [];
+    return regs.find((r) => r.mes === mesSel) ?? null;
+  };
+
+  // ============================================
+  // FORM
   // ============================================
   const resetForm = () => {
     setFormData(emptyForm);
@@ -217,6 +262,7 @@ export function Couch() {
 
   const validateForm = (): boolean => {
     const errors: Record<string, string> = {};
+
     if (!formData.nombres.trim())
       errors.nombres = "Los nombres son obligatorios";
     if (!formData.apellidos.trim())
@@ -236,6 +282,10 @@ export function Couch() {
       errors.telefono = "El teléfono debe tener exactamente 8 dígitos";
     } else if (!/^\d+$/.test(formData.telefono)) {
       errors.telefono = "El teléfono solo puede contener números";
+    }
+
+    if (!formData.sucursal_id) {
+      errors.sucursal_id = "La sucursal es obligatoria";
     }
 
     if (!editingCoach) {
@@ -260,21 +310,27 @@ export function Couch() {
   const executeSave = async () => {
     setIsConfirming(true);
     try {
-      const payload: CoachCreateRequest = {
-        nombres: formData.nombres,
-        apellidos: formData.apellidos,
-        ci: formData.ci,
-        telefono: formData.telefono,
-        metaInscritos: formData.metaInscritos,
-      };
-
       if (editingCoach) {
-        await updateCoach(editingCoach.id, payload);
+        await updateCoach(editingCoach.id, {
+          nombres: formData.nombres,
+          apellidos: formData.apellidos,
+          ci: formData.ci,
+          telefono: formData.telefono,
+          sucursal_id: formData.sucursal_id,
+        });
         toast({
           title: "Éxito",
           description: "Coach actualizado correctamente",
         });
       } else {
+        const payload: CoachCreateRequest = {
+          nombres: formData.nombres,
+          apellidos: formData.apellidos,
+          ci: formData.ci,
+          telefono: formData.telefono,
+          sucursal_id: formData.sucursal_id,
+          metaInscritos: formData.metaInscritos,
+        };
         await createCoach(payload);
         toast({
           title: "Éxito",
@@ -307,7 +363,8 @@ export function Couch() {
       apellidos: coach.apellidos,
       ci: coach.ci,
       telefono: coach.telefono,
-      metaInscritos: 10,
+      sucursal_id: coach.sucursalId || 0,
+      metaInscritos: coach.metaInscritos || 10,
     });
     setFormErrors({});
     setIsDialogOpen(true);
@@ -346,7 +403,7 @@ export function Couch() {
     }
   };
 
-  const toggleActive = async (id: string) => {
+  const toggleActive = async (id: number) => {
     setUpdatingStatus(id);
     try {
       const updated = await toggleCoachStatus(id);
@@ -364,10 +421,10 @@ export function Couch() {
   };
 
   // ============================================
-  // ADELANTO INLINE (con actualización optimista)
+  // ADELANTO INLINE
   // ============================================
   const startAdelantoEdit = (coach: Coach) => {
-    const reg = getRegistroMes(coach, mesSel);
+    const reg = getRegistro(coach.id);
     setAdelantoEditingId(coach.id);
     setAdelantoInput(String(reg?.adelantoMonto ?? 0));
     setTimeout(() => {
@@ -394,43 +451,30 @@ export function Couch() {
 
     setSavingAdelantoId(coach.id);
     try {
-      const reg = getRegistroMes(coach, mesSel);
-      const metaExistente = reg?.metaInscritos ?? 0;
+      const reg = getRegistro(coach.id);
+      const metaExistente = reg?.metaInscritos ?? coach.metaInscritos ?? 0;
 
-      await upsertRegistroMes(coach.id, {
+      const saved = await upsertRegistroMes(coach.id, {
         mes: mesSel,
         metaInscritos: metaExistente,
         adelantoMonto: monto,
       });
 
-      // ✅ Actualización optimista del estado local (sin recargar)
+      // Actualización optimista del cache local
+      setRegistrosPorCoach((prev) => {
+        const actuales = prev[coach.id] || [];
+        const existe = actuales.some((r) => r.mes === mesSel);
+        const nuevos = existe
+          ? actuales.map((r) => (r.mes === mesSel ? { ...r, ...saved } : r))
+          : [...actuales, saved];
+        return { ...prev, [coach.id]: nuevos };
+      });
+
+      // Actualizar el coach en la lista para reflejar adelanto
       setCoaches((prev) =>
-        prev.map((c) => {
-          if (c.id !== coach.id) return c;
-
-          const existe = c.registrosMes.some((r) => r.mes === mesSel);
-          const nuevosRegistros = existe
-            ? c.registrosMes.map((r) =>
-                r.mes === mesSel
-                  ? {
-                      ...r,
-                      adelantoMonto: monto,
-                      fechaActualizacion: new Date().toISOString(),
-                    }
-                  : r
-              )
-            : [
-                ...c.registrosMes,
-                {
-                  mes: mesSel,
-                  metaInscritos: metaExistente,
-                  adelantoMonto: monto,
-                  fechaActualizacion: new Date().toISOString(),
-                },
-              ];
-
-          return { ...c, registrosMes: nuevosRegistros };
-        })
+        prev.map((c) =>
+          c.id === coach.id ? { ...c, adelantoMonto: monto } : c
+        )
       );
 
       toast({
@@ -451,11 +495,28 @@ export function Couch() {
   };
 
   // ============================================
-  // MODAL OJO
+  // MODAL RESUMEN
   // ============================================
-  const openViewModal = (coach: Coach) => {
+  const openViewModal = async (coach: Coach) => {
     setCoachVer(coach);
+    setInscritosVer([]);
     setViewModalOpen(true);
+    setLoadingInscritos(true);
+    try {
+      const lista = await getInscritosCoach(coach.id, mesSel);
+      setInscritosVer(lista);
+    } catch (e) {
+      toast({
+        title: "Error",
+        description:
+          e instanceof Error
+            ? e.message
+            : "No se pudieron cargar los inscritos",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingInscritos(false);
+    }
   };
 
   // ============================================
@@ -527,7 +588,7 @@ export function Couch() {
               <DialogDescription>
                 {editingCoach
                   ? "Modifica los datos personales del coach."
-                  : "Completa la información del coach. El adelanto se registra directamente en la tabla, en la columna Adelanto."}
+                  : "Completa la información del coach. La meta se registra para el mes actual."}
               </DialogDescription>
             </DialogHeader>
 
@@ -547,10 +608,7 @@ export function Couch() {
                     <Input
                       value={formData.nombres}
                       onChange={(e) =>
-                        setFormData((p) => ({
-                          ...p,
-                          nombres: e.target.value,
-                        }))
+                        setFormData((p) => ({ ...p, nombres: e.target.value }))
                       }
                     />
                     {formErrors.nombres && (
@@ -618,37 +676,71 @@ export function Couch() {
                 </div>
               </div>
 
-              {!editingCoach && (
-                <div className="space-y-4 p-3 bg-muted/30 rounded-lg">
-                  <div className="flex items-center gap-2">
-                    <Target className="h-4 w-4 text-primary" />
-                    <Label className="text-sm font-semibold">
-                      Meta de inscritos — {formatMes(mesActual())}
-                    </Label>
-                  </div>
+              <div className="space-y-4 p-3 bg-muted/30 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <Building2 className="h-4 w-4 text-primary" />
+                  <Label className="text-sm font-semibold">
+                    Datos Laborales
+                  </Label>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="grid gap-1">
                     <Label>
-                      Meta de inscritos <span className="text-red-500">*</span>
+                      Sucursal <span className="text-red-500">*</span>
                     </Label>
-                    <Input
-                      type="number"
-                      min={1}
-                      value={formData.metaInscritos}
-                      onChange={(e) =>
+                    <Select
+                      value={formData.sucursal_id.toString()}
+                      onValueChange={(v) =>
                         setFormData((p) => ({
                           ...p,
-                          metaInscritos: parseInt(e.target.value) || 0,
+                          sucursal_id: parseInt(v),
                         }))
                       }
-                    />
-                    {formErrors.metaInscritos && (
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Seleccionar" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {branches.map((b) => (
+                          <SelectItem key={b.id} value={b.id.toString()}>
+                            {b.nombre}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {formErrors.sucursal_id && (
                       <p className="text-xs text-destructive">
-                        {formErrors.metaInscritos}
+                        {formErrors.sucursal_id}
                       </p>
                     )}
                   </div>
+
+                  {!editingCoach && (
+                    <div className="grid gap-1">
+                      <Label>
+                        Meta de inscritos — {formatMes(mesActual())}{" "}
+                        <span className="text-red-500">*</span>
+                      </Label>
+                      <Input
+                        type="number"
+                        min={1}
+                        value={formData.metaInscritos}
+                        onChange={(e) =>
+                          setFormData((p) => ({
+                            ...p,
+                            metaInscritos: parseInt(e.target.value) || 0,
+                          }))
+                        }
+                      />
+                      {formErrors.metaInscritos && (
+                        <p className="text-xs text-destructive">
+                          {formErrors.metaInscritos}
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
-              )}
+              </div>
             </div>
 
             <div className="flex justify-end gap-2 pt-2">
@@ -723,6 +815,7 @@ export function Couch() {
                   <TableHead>Coach</TableHead>
                   <TableHead>CI</TableHead>
                   <TableHead>Teléfono</TableHead>
+                  <TableHead>Sucursal</TableHead>
                   <TableHead>Meta</TableHead>
                   <TableHead>Inscritos</TableHead>
                   <TableHead>Adelanto</TableHead>
@@ -734,7 +827,7 @@ export function Couch() {
                 {paginatedCoaches.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={8}
+                      colSpan={9}
                       className="text-center py-8 text-muted-foreground"
                     >
                       No hay coaches registrados
@@ -742,13 +835,14 @@ export function Couch() {
                   </TableRow>
                 ) : (
                   paginatedCoaches.map((coach) => {
-                    const reg = getRegistroMes(coach, mesSel);
-                    const { nuevas, reinscripciones, total } = inscritosDelMes(
-                      coach,
-                      mesSel
-                    );
-                    const meta = reg?.metaInscritos ?? 0;
-                    const adelantoMes = reg?.adelantoMonto ?? 0;
+                    const reg = getRegistro(coach.id);
+                    const meta =
+                      reg?.metaInscritos ?? coach.metaInscritos ?? 0;
+                    const adelantoMes =
+                      reg?.adelantoMonto ?? coach.adelantoMonto ?? 0;
+                    const nuevas = coach.nuevasMes;
+                    const reinscripciones = coach.reinscripcionesMes;
+                    const total = coach.totalInscritosMes;
                     const progreso =
                       meta > 0
                         ? Math.min(100, Math.round((total / meta) * 100))
@@ -763,6 +857,7 @@ export function Couch() {
                         </TableCell>
                         <TableCell>{coach.ci}</TableCell>
                         <TableCell>{coach.telefono}</TableCell>
+                        <TableCell>{coach.sucursalNombre || "-"}</TableCell>
                         <TableCell>
                           <Badge variant="outline" className="gap-1">
                             <Target className="h-3 w-3" />
@@ -860,7 +955,9 @@ export function Couch() {
                                 size="sm"
                                 className="h-7 w-7 p-0"
                                 onClick={() => startAdelantoEdit(coach)}
-                                title={`Editar adelanto de ${formatMes(mesSel)}`}
+                                title={`Editar adelanto de ${formatMes(
+                                  mesSel
+                                )}`}
                               >
                                 <Edit2 className="h-3.5 w-3.5" />
                               </Button>
@@ -965,15 +1062,17 @@ export function Couch() {
           </Card>
         ) : (
           paginatedCoaches.map((coach) => {
-            const reg = getRegistroMes(coach, mesSel);
-            const { nuevas, reinscripciones, total } = inscritosDelMes(
-              coach,
-              mesSel
-            );
-            const meta = reg?.metaInscritos ?? 0;
-            const adelantoMes = reg?.adelantoMonto ?? 0;
+            const reg = getRegistro(coach.id);
+            const meta = reg?.metaInscritos ?? coach.metaInscritos ?? 0;
+            const adelantoMes =
+              reg?.adelantoMonto ?? coach.adelantoMonto ?? 0;
+            const nuevas = coach.nuevasMes;
+            const reinscripciones = coach.reinscripcionesMes;
+            const total = coach.totalInscritosMes;
             const progreso =
-              meta > 0 ? Math.min(100, Math.round((total / meta) * 100)) : 0;
+              meta > 0
+                ? Math.min(100, Math.round((total / meta) * 100))
+                : 0;
             const isEditing = adelantoEditingId === coach.id;
             const isSaving = savingAdelantoId === coach.id;
 
@@ -1023,6 +1122,10 @@ export function Couch() {
                       <span>{coach.telefono}</span>
                     </div>
                     <div className="flex justify-between">
+                      <span className="text-muted-foreground">Sucursal:</span>
+                      <span>{coach.sucursalNombre || "-"}</span>
+                    </div>
+                    <div className="flex justify-between">
                       <span className="text-muted-foreground">Meta:</span>
                       <span>{meta} inscritos</span>
                     </div>
@@ -1051,7 +1154,7 @@ export function Couch() {
                       </div>
                     </div>
 
-                    {/* Adelanto inline (versión móvil) */}
+                    {/* Adelanto inline móvil */}
                     <div className="flex justify-between items-center gap-2">
                       <span className="text-muted-foreground">Adelanto:</span>
                       {isEditing ? (
@@ -1203,83 +1306,145 @@ export function Couch() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Modal OJO - resumen simple del mes */}
+      {/* Modal resumen del mes */}
       <Dialog open={viewModalOpen} onOpenChange={setViewModalOpen}>
-        <DialogContent className="max-w-[90vw] md:max-w-md">
+        <DialogContent className="max-w-[95vw] md:max-w-3xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Award className="h-5 w-5 text-primary" />
               {coachVer?.nombres} {coachVer?.apellidos}
             </DialogTitle>
-            <DialogDescription>Resumen de {formatMes(mesSel)}</DialogDescription>
+            <DialogDescription>
+              Resumen de {formatMes(mesSel)}
+            </DialogDescription>
           </DialogHeader>
 
-          {coachVer &&
-            (() => {
-              const reg = getRegistroMes(coachVer, mesSel);
-              const { nuevas, reinscripciones, total } = inscritosDelMes(
-                coachVer,
-                mesSel
-              );
-              return (
-                <div className="space-y-3">
-                  <div className="grid grid-cols-2 gap-3">
-                    <Card>
-                      <CardContent className="p-3">
-                        <p className="text-xs text-muted-foreground">Meta</p>
-                        <p className="text-2xl font-bold">
-                          {reg?.metaInscritos ?? 0}
-                        </p>
-                      </CardContent>
-                    </Card>
-                    <Card>
-                      <CardContent className="p-3">
-                        <p className="text-xs text-muted-foreground">
-                          Total inscritos
-                        </p>
-                        <p className="text-2xl font-bold">{total}</p>
-                      </CardContent>
-                    </Card>
-                    <Card>
-                      <CardContent className="p-3">
-                        <p className="text-xs text-muted-foreground">Nuevas</p>
-                        <p className="text-2xl font-bold text-green-600">
-                          {nuevas}
-                        </p>
-                      </CardContent>
-                    </Card>
-                    <Card>
-                      <CardContent className="p-3">
-                        <p className="text-xs text-muted-foreground">
-                          Reinscripciones
-                        </p>
-                        <p className="text-2xl font-bold text-blue-600">
-                          {reinscripciones}
-                        </p>
-                      </CardContent>
-                    </Card>
-                  </div>
-
-                  <div className="p-3 rounded-lg bg-muted/40">
+          {coachVer && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <Card>
+                  <CardContent className="p-3">
+                    <p className="text-xs text-muted-foreground">Meta</p>
+                    <p className="text-2xl font-bold">
+                      {getRegistro(coachVer.id)?.metaInscritos ??
+                        coachVer.metaInscritos ??
+                        0}
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-3">
                     <p className="text-xs text-muted-foreground">
-                      Adelanto del mes
+                      Total inscritos
                     </p>
-                    <p className="text-xl font-bold">
-                      Bs. {(reg?.adelantoMonto ?? 0).toFixed(2)}
+                    <p className="text-2xl font-bold">
+                      {coachVer.totalInscritosMes}
                     </p>
-                  </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-3">
+                    <p className="text-xs text-muted-foreground">Nuevas</p>
+                    <p className="text-2xl font-bold text-green-600">
+                      {coachVer.nuevasMes}
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-3">
+                    <p className="text-xs text-muted-foreground">
+                      Reinscripciones
+                    </p>
+                    <p className="text-2xl font-bold text-blue-600">
+                      {coachVer.reinscripcionesMes}
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
 
-                  <div className="flex justify-end">
-                    <Button
-                      variant="outline"
-                      onClick={() => setViewModalOpen(false)}
-                    >
-                      Cerrar
-                    </Button>
+              <div className="p-3 rounded-lg bg-muted/40">
+                <p className="text-xs text-muted-foreground">
+                  Adelanto del mes
+                </p>
+                <p className="text-xl font-bold">
+                  Bs.{" "}
+                  {(
+                    getRegistro(coachVer.id)?.adelantoMonto ??
+                    coachVer.adelantoMonto ??
+                    0
+                  ).toFixed(2)}
+                </p>
+              </div>
+
+              {/* Lista de inscritos */}
+              <div>
+                <h4 className="text-sm font-semibold mb-2">
+                  Inscritos atribuidos a este coach
+                </h4>
+                {loadingInscritos ? (
+                  <div className="flex justify-center items-center py-6">
+                    <Loader2 className="h-5 w-5 animate-spin text-primary" />
                   </div>
-                </div>
-              );
-            })()}
+                ) : inscritosVer.length === 0 ? (
+                  <p className="text-sm text-muted-foreground py-4 text-center">
+                    No hay inscripciones atribuidas a este coach en este mes.
+                  </p>
+                ) : (
+                  <div className="rounded-md border overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Persona</TableHead>
+                          <TableHead>CI</TableHead>
+                          <TableHead>Servicio</TableHead>
+                          <TableHead>Fecha</TableHead>
+                          <TableHead>Tipo</TableHead>
+                          <TableHead>Total</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {inscritosVer.map((i) => (
+                          <TableRow key={i.detalleId}>
+                            <TableCell className="font-medium">
+                              {i.nombre}
+                            </TableCell>
+                            <TableCell>{i.ci}</TableCell>
+                            <TableCell>{i.servicioNombre}</TableCell>
+                            <TableCell>
+                              {new Date(i.fechaVenta).toLocaleDateString()}
+                            </TableCell>
+                            <TableCell>
+                              {i.tipo === "nueva" ? (
+                                <Badge className="bg-green-600 text-white">
+                                  Nueva
+                                </Badge>
+                              ) : (
+                                <Badge className="bg-blue-600 text-white">
+                                  Reinscripción
+                                </Badge>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              Bs. {i.totalVenta.toFixed(2)}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-end">
+                <Button
+                  variant="outline"
+                  onClick={() => setViewModalOpen(false)}
+                >
+                  Cerrar
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
