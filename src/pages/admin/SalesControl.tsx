@@ -1749,10 +1749,11 @@ export function SalesControl() {
               </div>
 
               {selectedSale.descuento > 0 && (
-                <div className="bg-amber-50 p-3 rounded-lg">
-                  <p className="text-xs md:text-sm">
-                    <span className="font-medium">Motivo descuento:</span>{" "}
-                    {selectedSale.justificacionDescuento || "No especificado"}
+                <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 p-3 rounded-lg">
+                  <p className="text-xs md:text-sm text-amber-900 dark:text-amber-100">
+                    <span className="font-semibold">Motivo descuento:</span>{" "}
+                    {selectedSale.justificacionDescuento?.trim() ||
+                      "No especificado"}
                   </p>
                 </div>
               )}
