@@ -111,17 +111,16 @@ export interface CoachCreateRequest {
   ci: string;
   telefono: string;
   sucursal_id: number;
-  metaInscritos: number;
+  metaInscritos: number; // requerido al crear
 }
 
+// ✅ En edición NO se envía metaInscritos (se edita inline)
 export interface CoachUpdateRequest {
   nombres: string;
   apellidos: string;
   ci: string;
   telefono: string;
   sucursal_id: number;
-  // ✅ Opcional: si viene, se actualiza la meta del mes actual
-  metaInscritos?: number;
 }
 
 export interface RegistroMesRequest {
@@ -164,7 +163,9 @@ api.interceptors.response.use(
             "redirect_after_login",
             window.location.pathname + window.location.search
           );
-        } catch { /* noop */ }
+        } catch {
+          /* noop */
+        }
         window.location.replace("/login");
       }
     }
@@ -244,7 +245,9 @@ function mapRegistro(r: BackendRegistroMes): RegistroMes {
 // ============================================
 export const getCoaches = async (mes?: string): Promise<Coach[]> => {
   try {
-    const { data } = await api.get<BackendCoach[]>("/", { params: mes ? { mes } : undefined });
+    const { data } = await api.get<BackendCoach[]>("/", {
+      params: mes ? { mes } : undefined,
+    });
     return data.map(mapCoach);
   } catch (e) {
     throw new Error(extractErrorMessage(e, "No se pudieron cargar los coaches"));
@@ -253,7 +256,9 @@ export const getCoaches = async (mes?: string): Promise<Coach[]> => {
 
 export const getCoachById = async (id: number, mes?: string): Promise<Coach> => {
   try {
-    const { data } = await api.get<BackendCoach>(`/${id}`, { params: mes ? { mes } : undefined });
+    const { data } = await api.get<BackendCoach>(`/${id}`, {
+      params: mes ? { mes } : undefined,
+    });
     return mapCoach(data);
   } catch (e) {
     throw new Error(extractErrorMessage(e, "No se pudo cargar el coach"));
@@ -271,7 +276,10 @@ export const createCoach = async (data: CoachCreateRequest): Promise<Coach> => {
   }
 };
 
-export const updateCoach = async (id: number, data: CoachUpdateRequest): Promise<Coach> => {
+export const updateCoach = async (
+  id: number,
+  data: CoachUpdateRequest
+): Promise<Coach> => {
   try {
     const { data: res } = await api.put<BackendCoach>(`/${id}`, data);
     return mapCoach(res);
@@ -295,7 +303,9 @@ export const toggleCoachStatus = async (id: number): Promise<Coach> => {
     const { data } = await api.patch<BackendCoach>(`/${id}/toggle-status`);
     return mapCoach(data);
   } catch (e) {
-    throw new Error(extractErrorMessage(e, "No se pudo cambiar el estado del coach"));
+    throw new Error(
+      extractErrorMessage(e, "No se pudo cambiar el estado del coach")
+    );
   }
 };
 
@@ -313,10 +323,15 @@ export const upsertRegistroMes = async (
   data: RegistroMesRequest
 ): Promise<RegistroMes> => {
   try {
-    const { data: res } = await api.put<BackendRegistroMes>(`/${coachId}/registros`, data);
+    const { data: res } = await api.put<BackendRegistroMes>(
+      `/${coachId}/registros`,
+      data
+    );
     return mapRegistro(res);
   } catch (e) {
-    throw new Error(extractErrorMessage(e, "No se pudo guardar el registro del mes"));
+    throw new Error(
+      extractErrorMessage(e, "No se pudo guardar el registro del mes")
+    );
   }
 };
 
@@ -352,8 +367,18 @@ export function addMeses(mes: string, delta: number): string {
 export function formatMes(mes: string): string {
   const [year, month] = mes.split("-");
   const meses = [
-    "Enero","Febrero","Marzo","Abril","Mayo","Junio",
-    "Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre",
+    "Enero",
+    "Febrero",
+    "Marzo",
+    "Abril",
+    "Mayo",
+    "Junio",
+    "Julio",
+    "Agosto",
+    "Septiembre",
+    "Octubre",
+    "Noviembre",
+    "Diciembre",
   ];
   const m = parseInt(month, 10) - 1;
   return `${meses[m] ?? month} ${year}`;

@@ -95,13 +95,27 @@ interface ConfirmState {
   coach: Coach | null;
 }
 
+type InlineEditField = "meta" | "adelanto";
+
+interface InlineEditState {
+  coachId: number | null;
+  field: InlineEditField | null;
+  value: string;
+}
+
 const emptyForm = {
   nombres: "",
   apellidos: "",
   ci: "",
   telefono: "",
   sucursal_id: 0,
-  metaInscritos: 10,
+  metaInscritos: 10, // solo se usa al crear
+};
+
+const emptyInlineEdit: InlineEditState = {
+  coachId: null,
+  field: null,
+  value: "",
 };
 
 export function Couch() {
@@ -130,13 +144,11 @@ export function Couch() {
   });
   const [isConfirming, setIsConfirming] = useState(false);
 
-  // Edición inline del adelanto
-  const [adelantoEditingId, setAdelantoEditingId] = useState<number | null>(
-    null
-  );
-  const [adelantoInput, setAdelantoInput] = useState<string>("");
-  const [savingAdelantoId, setSavingAdelantoId] = useState<number | null>(null);
-  const adelantoInputRef = useRef<HTMLInputElement>(null);
+  // Edición inline (meta o adelanto)
+  const [inlineEdit, setInlineEdit] =
+    useState<InlineEditState>(emptyInlineEdit);
+  const [savingInline, setSavingInline] = useState<number | null>(null);
+  const inlineInputRef = useRef<HTMLInputElement>(null);
 
   // Modal de resumen
   const [viewModalOpen, setViewModalOpen] = useState(false);
@@ -199,8 +211,7 @@ export function Couch() {
 
   // Al cambiar de mes → recargar (los stats cambian) y cerrar edición inline
   useEffect(() => {
-    setAdelantoEditingId(null);
-    setAdelantoInput("");
+    setInlineEdit(emptyInlineEdit);
     loadData(mesSel);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mesSel]);
@@ -288,9 +299,11 @@ export function Couch() {
       errors.sucursal_id = "La sucursal es obligatoria";
     }
 
-    // ✅ Meta obligatoria tanto en crear como en editar
-    if (!formData.metaInscritos || formData.metaInscritos <= 0) {
-      errors.metaInscritos = "Debe indicar una meta mayor a 0";
+    // ✅ La meta solo se valida al CREAR (al editar se cambia inline)
+    if (!editingCoach) {
+      if (!formData.metaInscritos || formData.metaInscritos <= 0) {
+        errors.metaInscritos = "Debe indicar una meta mayor a 0";
+      }
     }
 
     setFormErrors(errors);
@@ -310,14 +323,13 @@ export function Couch() {
     setIsConfirming(true);
     try {
       if (editingCoach) {
-        // ✅ En edición también enviamos metaInscritos
+        // ✅ En edición NO se envía metaInscritos (se edita inline)
         await updateCoach(editingCoach.id, {
           nombres: formData.nombres,
           apellidos: formData.apellidos,
           ci: formData.ci,
           telefono: formData.telefono,
           sucursal_id: formData.sucursal_id,
-          metaInscritos: formData.metaInscritos,
         });
         toast({
           title: "Éxito",
@@ -359,17 +371,13 @@ export function Couch() {
 
   const handleEditCoach = (coach: Coach) => {
     setEditingCoach(coach);
-    // ✅ Tomar la meta del mes seleccionado (o la del coach) para editarla
-    const reg = getRegistro(coach.id);
-    const metaActual = reg?.metaInscritos ?? coach.metaInscritos ?? 10;
-
     setFormData({
       nombres: coach.nombres,
       apellidos: coach.apellidos,
       ci: coach.ci,
       telefono: coach.telefono,
       sucursal_id: coach.sucursalId || 0,
-      metaInscritos: metaActual > 0 ? metaActual : 10,
+      metaInscritos: coach.metaInscritos > 0 ? coach.metaInscritos : 10,
     });
     setFormErrors({});
     setIsDialogOpen(true);
@@ -426,26 +434,36 @@ export function Couch() {
   };
 
   // ============================================
-  // ADELANTO INLINE
+  // EDICIÓN INLINE (META / ADELANTO)
   // ============================================
-  const startAdelantoEdit = (coach: Coach) => {
-    const reg = getRegistro(coach.id);
-    setAdelantoEditingId(coach.id);
-    setAdelantoInput(String(reg?.adelantoMonto ?? 0));
+  const startInlineEdit = (
+    coach: Coach,
+    field: InlineEditField,
+    initialValue: number
+  ) => {
+    setInlineEdit({
+      coachId: coach.id,
+      field,
+      value: String(initialValue ?? 0),
+    });
     setTimeout(() => {
-      adelantoInputRef.current?.focus();
-      adelantoInputRef.current?.select();
+      inlineInputRef.current?.focus();
+      inlineInputRef.current?.select();
     }, 50);
   };
 
-  const cancelAdelantoEdit = () => {
-    setAdelantoEditingId(null);
-    setAdelantoInput("");
+  const cancelInlineEdit = () => {
+    setInlineEdit(emptyInlineEdit);
   };
 
-  const saveAdelanto = async (coach: Coach) => {
-    const monto = parseFloat(adelantoInput) || 0;
-    if (monto < 0) {
+  const saveInline = async (coach: Coach) => {
+    if (inlineEdit.coachId !== coach.id || !inlineEdit.field) return;
+
+    const field = inlineEdit.field;
+    const raw = parseFloat(inlineEdit.value);
+    const num = isNaN(raw) ? 0 : raw;
+
+    if (field === "adelanto" && num < 0) {
       toast({
         title: "Error",
         description: "El monto no puede ser negativo",
@@ -454,15 +472,28 @@ export function Couch() {
       return;
     }
 
-    setSavingAdelantoId(coach.id);
+    if (field === "meta" && num <= 0) {
+      toast({
+        title: "Error",
+        description: "La meta debe ser mayor a 0",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setSavingInline(coach.id);
     try {
       const reg = getRegistro(coach.id);
       const metaExistente = reg?.metaInscritos ?? coach.metaInscritos ?? 0;
+      const adelantoExistente = reg?.adelantoMonto ?? coach.adelantoMonto ?? 0;
+
+      const newMeta = field === "meta" ? Math.round(num) : metaExistente;
+      const newAdelanto = field === "adelanto" ? num : adelantoExistente;
 
       const saved = await upsertRegistroMes(coach.id, {
         mes: mesSel,
-        metaInscritos: metaExistente,
-        adelantoMonto: monto,
+        metaInscritos: newMeta,
+        adelantoMonto: newAdelanto,
       });
 
       // Actualización optimista del cache local
@@ -475,19 +506,28 @@ export function Couch() {
         return { ...prev, [coach.id]: nuevos };
       });
 
-      // Actualizar el coach en la lista para reflejar adelanto
+      // Actualizar el coach en la lista para reflejar cambios
       setCoaches((prev) =>
         prev.map((c) =>
-          c.id === coach.id ? { ...c, adelantoMonto: monto } : c
+          c.id === coach.id
+            ? {
+                ...c,
+                metaInscritos: newMeta,
+                adelantoMonto: newAdelanto,
+              }
+            : c
         )
       );
 
       toast({
-        title: "Adelanto guardado",
-        description: `Bs. ${monto.toFixed(2)} — ${formatMes(mesSel)}`,
+        title: field === "meta" ? "Meta guardada" : "Adelanto guardado",
+        description:
+          field === "meta"
+            ? `${newMeta} inscritos — ${formatMes(mesSel)}`
+            : `Bs. ${newAdelanto.toFixed(2)} — ${formatMes(mesSel)}`,
       });
 
-      cancelAdelantoEdit();
+      cancelInlineEdit();
     } catch (e) {
       toast({
         title: "Error",
@@ -495,7 +535,7 @@ export function Couch() {
         variant: "destructive",
       });
     } finally {
-      setSavingAdelantoId(null);
+      setSavingInline(null);
     }
   };
 
@@ -539,7 +579,7 @@ export function Couch() {
       return `Se registrará a ${formData.nombres} ${formData.apellidos} como coach con meta de ${formData.metaInscritos} inscritos. ¿Deseas continuar?`;
     }
     if (confirmState.action === "update") {
-      return `Se actualizará la información de ${formData.nombres} ${formData.apellidos}, incluida la meta del mes actual (${formData.metaInscritos} inscritos). ¿Deseas continuar?`;
+      return `Se actualizará la información personal y laboral de ${formData.nombres} ${formData.apellidos}. La meta y el adelanto se editan directamente en la tabla. ¿Deseas continuar?`;
     }
     if (confirmState.action === "delete" && confirmState.coach) {
       return `Esta acción eliminará permanentemente al coach ${confirmState.coach.nombres} ${confirmState.coach.apellidos}. No se puede deshacer.`;
@@ -592,7 +632,7 @@ export function Couch() {
               </DialogTitle>
               <DialogDescription>
                 {editingCoach
-                  ? "Modifica los datos personales del coach y su meta de inscritos del mes actual."
+                  ? "Modifica los datos personales y laborales del coach. La meta y el adelanto se editan directamente en la tabla."
                   : "Completa la información del coach. La meta se registra para el mes actual."}
               </DialogDescription>
             </DialogHeader>
@@ -720,35 +760,42 @@ export function Couch() {
                     )}
                   </div>
 
-                  {/* ✅ Meta editable tanto en crear como en editar */}
-                  <div className="grid gap-1">
-                    <Label>
-                      Meta de inscritos —{" "}
-                      {editingCoach ? formatMes(mesActual()) : formatMes(mesActual())}{" "}
-                      <span className="text-red-500">*</span>
-                    </Label>
-                    <Input
-                      type="number"
-                      min={1}
-                      value={formData.metaInscritos}
-                      onChange={(e) =>
-                        setFormData((p) => ({
-                          ...p,
-                          metaInscritos: parseInt(e.target.value) || 0,
-                        }))
-                      }
-                    />
-                    {formErrors.metaInscritos && (
-                      <p className="text-xs text-destructive">
-                        {formErrors.metaInscritos}
+                  {/* ✅ Meta SOLO al crear. Al editar se edita inline en la tabla. */}
+                  {!editingCoach && (
+                    <div className="grid gap-1">
+                      <Label>
+                        Meta de inscritos — {formatMes(mesActual())}{" "}
+                        <span className="text-red-500">*</span>
+                      </Label>
+                      <Input
+                        type="number"
+                        min={1}
+                        value={formData.metaInscritos}
+                        onChange={(e) =>
+                          setFormData((p) => ({
+                            ...p,
+                            metaInscritos: parseInt(e.target.value) || 0,
+                          }))
+                        }
+                      />
+                      {formErrors.metaInscritos && (
+                        <p className="text-xs text-destructive">
+                          {formErrors.metaInscritos}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                  {editingCoach && (
+                    <div className="grid gap-1">
+                      <Label className="text-xs text-muted-foreground">
+                        Meta y adelanto
+                      </Label>
+                      <p className="text-sm text-muted-foreground">
+                        La meta y el adelanto se editan directamente en la
+                        tabla (íconos de edición por fila).
                       </p>
-                    )}
-                    {editingCoach && (
-                      <p className="text-[11px] text-muted-foreground">
-                        Se actualizará la meta de {formatMes(mesActual())}.
-                      </p>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -857,8 +904,14 @@ export function Couch() {
                       meta > 0
                         ? Math.min(100, Math.round((total / meta) * 100))
                         : 0;
-                    const isEditing = adelantoEditingId === coach.id;
-                    const isSaving = savingAdelantoId === coach.id;
+
+                    const editingMeta =
+                      inlineEdit.coachId === coach.id &&
+                      inlineEdit.field === "meta";
+                    const editingAdelanto =
+                      inlineEdit.coachId === coach.id &&
+                      inlineEdit.field === "adelanto";
+                    const isSaving = savingInline === coach.id;
 
                     return (
                       <TableRow key={coach.id}>
@@ -868,12 +921,76 @@ export function Couch() {
                         <TableCell>{coach.ci}</TableCell>
                         <TableCell>{coach.telefono}</TableCell>
                         <TableCell>{coach.sucursalNombre || "-"}</TableCell>
+
+                        {/* ✅ Meta inline */}
                         <TableCell>
-                          <Badge variant="outline" className="gap-1">
-                            <Target className="h-3 w-3" />
-                            {meta}
-                          </Badge>
+                          {editingMeta ? (
+                            <div className="flex items-center gap-1">
+                              <Input
+                                ref={inlineInputRef}
+                                type="number"
+                                min={1}
+                                value={inlineEdit.value}
+                                onChange={(e) =>
+                                  setInlineEdit((p) => ({
+                                    ...p,
+                                    value: e.target.value,
+                                  }))
+                                }
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") saveInline(coach);
+                                  else if (e.key === "Escape")
+                                    cancelInlineEdit();
+                                }}
+                                className="h-8 w-20 text-sm"
+                                disabled={isSaving}
+                              />
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-8 w-8 p-0"
+                                onClick={() => saveInline(coach)}
+                                disabled={isSaving}
+                                title="Guardar"
+                              >
+                                {isSaving ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Check className="h-4 w-4 text-green-600" />
+                                )}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-8 w-8 p-0"
+                                onClick={cancelInlineEdit}
+                                disabled={isSaving}
+                                title="Cancelar"
+                              >
+                                <X className="h-4 w-4 text-red-500" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline" className="gap-1">
+                                <Target className="h-3 w-3" />
+                                {meta}
+                              </Badge>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 w-7 p-0"
+                                onClick={() =>
+                                  startInlineEdit(coach, "meta", meta)
+                                }
+                                title={`Editar meta de ${formatMes(mesSel)}`}
+                              >
+                                <Edit2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          )}
                         </TableCell>
+
                         <TableCell>
                           <div className="flex flex-col gap-1">
                             <div className="flex items-center gap-1 text-xs">
@@ -898,24 +1015,25 @@ export function Couch() {
                           </div>
                         </TableCell>
 
-                        {/* Adelanto inline */}
+                        {/* ✅ Adelanto inline */}
                         <TableCell>
-                          {isEditing ? (
+                          {editingAdelanto ? (
                             <div className="flex items-center gap-1">
                               <Input
-                                ref={adelantoInputRef}
+                                ref={inlineInputRef}
                                 type="number"
                                 min={0}
-                                value={adelantoInput}
+                                value={inlineEdit.value}
                                 onChange={(e) =>
-                                  setAdelantoInput(e.target.value)
+                                  setInlineEdit((p) => ({
+                                    ...p,
+                                    value: e.target.value,
+                                  }))
                                 }
                                 onKeyDown={(e) => {
-                                  if (e.key === "Enter") {
-                                    saveAdelanto(coach);
-                                  } else if (e.key === "Escape") {
-                                    cancelAdelantoEdit();
-                                  }
+                                  if (e.key === "Enter") saveInline(coach);
+                                  else if (e.key === "Escape")
+                                    cancelInlineEdit();
                                 }}
                                 className="h-8 w-24 text-sm"
                                 disabled={isSaving}
@@ -924,7 +1042,7 @@ export function Couch() {
                                 size="sm"
                                 variant="ghost"
                                 className="h-8 w-8 p-0"
-                                onClick={() => saveAdelanto(coach)}
+                                onClick={() => saveInline(coach)}
                                 disabled={isSaving}
                                 title="Guardar"
                               >
@@ -938,7 +1056,7 @@ export function Couch() {
                                 size="sm"
                                 variant="ghost"
                                 className="h-8 w-8 p-0"
-                                onClick={cancelAdelantoEdit}
+                                onClick={cancelInlineEdit}
                                 disabled={isSaving}
                                 title="Cancelar"
                               >
@@ -964,7 +1082,13 @@ export function Couch() {
                                 variant="ghost"
                                 size="sm"
                                 className="h-7 w-7 p-0"
-                                onClick={() => startAdelantoEdit(coach)}
+                                onClick={() =>
+                                  startInlineEdit(
+                                    coach,
+                                    "adelanto",
+                                    adelantoMes
+                                  )
+                                }
                                 title={`Editar adelanto de ${formatMes(
                                   mesSel
                                 )}`}
@@ -1083,8 +1207,13 @@ export function Couch() {
               meta > 0
                 ? Math.min(100, Math.round((total / meta) * 100))
                 : 0;
-            const isEditing = adelantoEditingId === coach.id;
-            const isSaving = savingAdelantoId === coach.id;
+
+            const editingMeta =
+              inlineEdit.coachId === coach.id && inlineEdit.field === "meta";
+            const editingAdelanto =
+              inlineEdit.coachId === coach.id &&
+              inlineEdit.field === "adelanto";
+            const isSaving = savingInline === coach.id;
 
             return (
               <Card key={coach.id}>
@@ -1135,10 +1264,69 @@ export function Couch() {
                       <span className="text-muted-foreground">Sucursal:</span>
                       <span>{coach.sucursalNombre || "-"}</span>
                     </div>
-                    <div className="flex justify-between">
+
+                    {/* ✅ Meta inline móvil */}
+                    <div className="flex justify-between items-center gap-2">
                       <span className="text-muted-foreground">Meta:</span>
-                      <span>{meta} inscritos</span>
+                      {editingMeta ? (
+                        <div className="flex items-center gap-1">
+                          <Input
+                            type="number"
+                            min={1}
+                            value={inlineEdit.value}
+                            onChange={(e) =>
+                              setInlineEdit((p) => ({
+                                ...p,
+                                value: e.target.value,
+                              }))
+                            }
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") saveInline(coach);
+                              else if (e.key === "Escape") cancelInlineEdit();
+                            }}
+                            className="h-8 w-20 text-sm"
+                            disabled={isSaving}
+                          />
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 w-8 p-0"
+                            onClick={() => saveInline(coach)}
+                            disabled={isSaving}
+                          >
+                            {isSaving ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Check className="h-4 w-4 text-green-600" />
+                            )}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 w-8 p-0"
+                            onClick={cancelInlineEdit}
+                            disabled={isSaving}
+                          >
+                            <X className="h-4 w-4 text-red-500" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <span>{meta} inscritos</span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 p-0"
+                            onClick={() =>
+                              startInlineEdit(coach, "meta", meta)
+                            }
+                          >
+                            <Edit2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      )}
                     </div>
+
                     <div className="flex justify-between items-center">
                       <span className="text-muted-foreground">Inscritos:</span>
                       <div className="flex gap-1">
@@ -1164,19 +1352,24 @@ export function Couch() {
                       </div>
                     </div>
 
-                    {/* Adelanto inline móvil */}
+                    {/* ✅ Adelanto inline móvil */}
                     <div className="flex justify-between items-center gap-2">
                       <span className="text-muted-foreground">Adelanto:</span>
-                      {isEditing ? (
+                      {editingAdelanto ? (
                         <div className="flex items-center gap-1">
                           <Input
                             type="number"
                             min={0}
-                            value={adelantoInput}
-                            onChange={(e) => setAdelantoInput(e.target.value)}
+                            value={inlineEdit.value}
+                            onChange={(e) =>
+                              setInlineEdit((p) => ({
+                                ...p,
+                                value: e.target.value,
+                              }))
+                            }
                             onKeyDown={(e) => {
-                              if (e.key === "Enter") saveAdelanto(coach);
-                              else if (e.key === "Escape") cancelAdelantoEdit();
+                              if (e.key === "Enter") saveInline(coach);
+                              else if (e.key === "Escape") cancelInlineEdit();
                             }}
                             className="h-8 w-24 text-sm"
                             disabled={isSaving}
@@ -1185,7 +1378,7 @@ export function Couch() {
                             size="sm"
                             variant="ghost"
                             className="h-8 w-8 p-0"
-                            onClick={() => saveAdelanto(coach)}
+                            onClick={() => saveInline(coach)}
                             disabled={isSaving}
                           >
                             {isSaving ? (
@@ -1198,7 +1391,7 @@ export function Couch() {
                             size="sm"
                             variant="ghost"
                             className="h-8 w-8 p-0"
-                            onClick={cancelAdelantoEdit}
+                            onClick={cancelInlineEdit}
                             disabled={isSaving}
                           >
                             <X className="h-4 w-4 text-red-500" />
@@ -1215,7 +1408,9 @@ export function Couch() {
                             variant="ghost"
                             size="sm"
                             className="h-7 w-7 p-0"
-                            onClick={() => startAdelantoEdit(coach)}
+                            onClick={() =>
+                              startInlineEdit(coach, "adelanto", adelantoMes)
+                            }
                           >
                             <Edit2 className="h-3.5 w-3.5" />
                           </Button>
