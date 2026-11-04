@@ -61,6 +61,15 @@ export interface BackendCoupon {
   usosActuales: number;
 }
 
+export interface BackendCoach {
+  id: number;
+  nombres: string;
+  apellidos: string;
+  ci: string;
+  telefono: string;
+  nombre_completo: string;
+}
+
 // ============================================
 // TIPOS FRONTEND
 // ============================================
@@ -98,7 +107,6 @@ export interface ActiveSubscription {
   fechaVencimiento: string;
   ingresosDisponibles: number;
   estado: number;
-  /** 'activo' = vigente hoy. 'inactivo' = futura (aún no comienza) o reemplazada. */
   estadoInscripcion: "activo" | "inactivo";
   multisucursal: boolean;
   personaId?: number;
@@ -128,9 +136,6 @@ export interface RegistrationService {
   fechaVencimiento: string;
   precio: number;
   personaIndexes: number[];
-  /** ✅ NUEVO: true cuando el servicio NO requiere persona y no hay
-   *  ninguna persona seleccionada. El backend registrará la inscripción
-   *  con persona_id = NULL. */
   sinPersona?: boolean;
 }
 
@@ -150,6 +155,7 @@ export interface RegistrationRequest {
   montoEntregado?: number;
   montoPendiente?: number;
   cupon_codigo?: string;
+  coach_id?: number;
 }
 
 export interface RegistrationResponse {
@@ -181,6 +187,15 @@ export interface Coupon {
   fechaExpiracion: string;
   usosMaximos: number;
   usosActuales: number;
+}
+
+export interface Coach {
+  id: number;
+  nombres: string;
+  apellidos: string;
+  ci: string;
+  telefono: string;
+  nombreCompleto: string;
 }
 
 // ============================================
@@ -221,8 +236,6 @@ export const getServicesByBranch = async (
       multisucursal: service.multisucursal,
       tipoDuracion: service.tipo_duracion,
       cantidadDuracion: service.cantidad_duracion,
-      // ✅ Normalizamos: si viene null/undefined se trata como 1 por defecto
-      //    (compatibilidad con servicios viejos), pero si viene 0 se respeta 0.
       requierePersonas:
         service.cantidad_personas === null ||
         service.cantidad_personas === undefined
@@ -233,6 +246,30 @@ export const getServicesByBranch = async (
   } catch (error) {
     console.error("Error fetching services:", error);
     throw new Error("No se pudieron cargar los servicios");
+  }
+};
+
+// ============================================
+// COACHES POR SUCURSAL
+// ============================================
+export const getCoachesBySucursal = async (
+  sucursalId: number
+): Promise<Coach[]> => {
+  try {
+    const response = await api.get<BackendCoach[]>(
+      `/inscription/coaches/sucursal/${sucursalId}`
+    );
+    return response.data.map((c) => ({
+      id: c.id,
+      nombres: c.nombres,
+      apellidos: c.apellidos,
+      ci: c.ci,
+      telefono: c.telefono,
+      nombreCompleto: c.nombre_completo,
+    }));
+  } catch (error) {
+    console.error("Error fetching coaches:", error);
+    throw new Error("No se pudieron cargar los coaches");
   }
 };
 

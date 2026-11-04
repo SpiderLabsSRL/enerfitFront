@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
@@ -32,6 +33,7 @@ import {
   Loader2,
   Pencil,
   Lock,
+  UserCheck,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -55,10 +57,12 @@ import {
   getCashRegisterStatus,
   registerMember,
   validateCoupon as validateCouponApi,
+  getCoachesBySucursal,
   type Service,
   type Person,
   type ActiveSubscription,
   type Coupon,
+  type Coach,
 } from "../../api/RegisterMemberApi";
 
 interface PersonValidationState {
@@ -70,8 +74,6 @@ interface PersonValidationState {
   action: "replace" | "future" | null;
   startDate: Date | null;
   isPending: boolean;
-  /** Indica que la fecha fue fijada por una regla (replace/future) y NO es editable
-   *  para recepcionistas. Para admin es editable igual (pero se marca visualmente). */
   isDateLocked: boolean;
 }
 
@@ -80,17 +82,13 @@ interface PersonDateAssignment {
   personName: string;
   startDate: Date | null;
   endDate: Date | null;
-  /** Si es true, no se le pedirá fecha ni se podrá editar después
-   *  (solo aplica a recepcionistas; admin siempre puede editar) */
   dateLocked: boolean;
 }
 
 interface GroupDateAssignmentFlow {
   service: Service;
   assignments: PersonDateAssignment[];
-  /** Índices (dentro de assignments) que aún necesitan fecha manual */
   pendingIndexes: number[];
-  /** Posición actual dentro de pendingIndexes */
   pendingCursor: number;
 }
 
@@ -268,7 +266,6 @@ export function RegisterMember() {
     Record<number, Record<string, { startDate: Date; endDate: Date }>>
   >({});
   const [lockedServiceIds, setLockedServiceIds] = useState<number[]>([]);
-  /** NUEVO: personas con fecha bloqueada por servicio (no editables para recepcionista) */
   const [lockedPersonDates, setLockedPersonDates] = useState<
     Record<number, string[]>
   >({});
@@ -312,6 +309,14 @@ export function RegisterMember() {
   const [allServices, setAllServices] = useState<Service[]>([]);
   const [loadingServices, setLoadingServices] = useState(true);
 
+  // ============================================
+  // COACH (switch)
+  // ============================================
+  const [coaches, setCoaches] = useState<Coach[]>([]);
+  const [coachEnabled, setCoachEnabled] = useState(false);
+  const [selectedCoachId, setSelectedCoachId] = useState<number | null>(null);
+  const [loadingCoaches, setLoadingCoaches] = useState(false);
+
   const [pendingValidations, setPendingValidations] = useState<
     PersonValidationState[]
   >([]);
@@ -333,16 +338,12 @@ export function RegisterMember() {
   const [showSinglePersonValidationDialog, setShowSinglePersonValidationDialog] =
     useState(false);
 
-  // ============================================
-  // Flujo de asignación de fechas por persona (grupal)
-  // ============================================
   const [groupDateFlow, setGroupDateFlow] =
     useState<GroupDateAssignmentFlow | null>(null);
   const [showGroupDateDialog, setShowGroupDateDialog] = useState(false);
   const [showGroupDateCalendar, setShowGroupDateCalendar] = useState(false);
   const [groupDateTemp, setGroupDateTemp] = useState<Date>(new Date());
 
-  // Edición de fecha individual de un servicio grupal
   const [editingPersonDate, setEditingPersonDate] = useState<{
     serviceId: number;
     personKey: string;
@@ -356,7 +357,6 @@ export function RegisterMember() {
 
   const { toast } = useToast();
 
-  // ✅ CAMBIO: admin puede editar fechas fijadas automáticamente
   const isAdmin = user?.rol === "admin";
 
   const { startEnroll, cancelEnroll } = useFingerprintEnroll({
@@ -467,6 +467,40 @@ export function RegisterMember() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.idcaja]);
 
+  // ============================================
+  // CARGAR COACHES
+  // ============================================
+  useEffect(() => {
+    const loadCoaches = async () => {
+      if (!coachEnabled || !user?.idsucursal) {
+        setCoaches([]);
+        return;
+      }
+      try {
+        setLoadingCoaches(true);
+        const list = await getCoachesBySucursal(user.idsucursal);
+        setCoaches(list);
+      } catch (e) {
+        toast({
+          title: "Error",
+          description: "No se pudieron cargar los coaches",
+          variant: "destructive",
+        });
+      } finally {
+        setLoadingCoaches(false);
+      }
+    };
+    loadCoaches();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [coachEnabled, user?.idsucursal]);
+
+  // Reset al apagar el switch
+  useEffect(() => {
+    if (!coachEnabled) {
+      setSelectedCoachId(null);
+    }
+  }, [coachEnabled]);
+
   useEffect(() => {
     const savedMember = localStorage.getItem("selectedMemberForEnrollment");
     if (savedMember) {
@@ -550,6 +584,10 @@ export function RegisterMember() {
 
   const calculateTotal = () => {
     const sub = calculateSubtotal();
+    // ✅ Si hay coach aplicado, el total pasa a 0
+    if (coachEnabled && selectedCoachId) {
+      return 0;
+    }
     return Math.max(0, sub - discountAmount);
   };
 
@@ -684,7 +722,6 @@ export function RegisterMember() {
       persons: personsForService,
     });
 
-    // Verificar suscripciones activas del mismo tipo para cada persona
     const validations: PersonValidationState[] = [];
 
     for (let i = 0; i < service.requierePersonas; i++) {
@@ -723,9 +760,6 @@ export function RegisterMember() {
     startGroupDateAssignmentFlow(service, personsForService, validations);
   };
 
-  // ============================================
-  // Flujo de asignación de fechas por persona
-  // ============================================
   const startGroupDateAssignmentFlow = (
     service: Service,
     persons: Person[],
@@ -733,8 +767,8 @@ export function RegisterMember() {
   ) => {
     const assignments: PersonDateAssignment[] = persons.map((p, i) => {
       const base = baseValidations[i];
-      // ✅ CAMBIO: solo bloqueamos si NO es admin
-      const locked = !isAdmin && (base?.action === "replace" || base?.action === "future");
+      const locked =
+        !isAdmin && (base?.action === "replace" || base?.action === "future");
       const startDate = base?.startDate ?? null;
       return {
         personKey: p._key,
@@ -745,8 +779,6 @@ export function RegisterMember() {
       };
     });
 
-    // ✅ CAMBIO: solo pedimos fecha a quienes NO tienen fecha fija (o si es admin,
-    //    pedimos fecha a TODOS los que no tengan startDate)
     const pendingIndexes = assignments
       .map((a, idx) => (a.dateLocked ? -1 : idx))
       .filter((idx) => idx !== -1);
@@ -776,7 +808,6 @@ export function RegisterMember() {
   const handleGroupDateConfirm = () => {
     if (!groupDateFlow) return;
 
-    // ✅ CAMBIO: admin puede elegir cualquier fecha
     if (!isAdmin && !isDateInAllowedRange(groupDateTemp)) {
       toast({
         title: "⚠️ Fecha fuera de rango",
@@ -835,7 +866,6 @@ export function RegisterMember() {
         startDate: a.startDate,
         endDate: a.endDate,
       };
-      // ✅ CAMBIO: para admin NUNCA se marca como locked
       if (a.dateLocked && !isAdmin) {
         newLockedPersons.push(a.personKey);
       }
@@ -864,7 +894,6 @@ export function RegisterMember() {
 
     setSelectedServices((prev) => [...prev, service]);
 
-    // ✅ CAMBIO: para admin NUNCA se bloquea el serviceId completo
     const allLocked = !isAdmin && assignments.every((a) => a.dateLocked);
     if (allLocked) {
       setLockedServiceIds((prev) => [...prev, service.idServicio]);
@@ -896,7 +925,6 @@ export function RegisterMember() {
         action: "replace",
         startDate: startOfToday(),
         isPending: false,
-        // ✅ CAMBIO: solo bloqueado para no-admin
         isDateLocked: !isAdmin,
       };
     } else if (action === "future") {
@@ -912,7 +940,6 @@ export function RegisterMember() {
         action: "future",
         startDate: finActiva,
         isPending: false,
-        // ✅ CAMBIO: solo bloqueado para no-admin
         isDateLocked: !isAdmin,
       };
     }
@@ -937,7 +964,6 @@ export function RegisterMember() {
     const currentValidation = pendingValidations[currentValidationIndex];
     if (!currentValidation) return;
 
-    // ✅ CAMBIO: admin sin restricción de rango
     if (!isAdmin && !isDateInAllowedRange(tempCalendarDate)) {
       toast({
         title: "⚠️ Fecha fuera de rango",
@@ -1076,11 +1102,9 @@ export function RegisterMember() {
       finActiva.setDate(finActiva.getDate() + 1);
       finActiva.setHours(0, 0, 0, 0);
       startDate = finActiva;
-      // ✅ CAMBIO: solo bloqueamos a no-admin
       lockPerson = !isAdmin;
     } else {
       startDate = startOfToday();
-      // ✅ CAMBIO: solo bloqueamos a no-admin
       lockPerson = !isAdmin;
     }
 
@@ -1098,7 +1122,6 @@ export function RegisterMember() {
     }));
     setSelectedServices((prev) => [...prev, tempServiceForValidation]);
 
-    // ✅ CAMBIO: para admin NO se bloquea el serviceId
     if (lockPerson) {
       setLockedServiceIds((prev) => [
         ...prev,
@@ -1157,13 +1180,12 @@ export function RegisterMember() {
   };
 
   // ============================================
-  // Editar fecha individual de un servicio grupal
+  // Editar fecha individual
   // ============================================
   const isPersonDateLocked = (
     serviceId: number,
     personKey: string
   ): boolean => {
-    // ✅ CAMBIO: admin NUNCA ve fechas bloqueadas
     if (isAdmin) return false;
     return (lockedPersonDates[serviceId] || []).includes(personKey);
   };
@@ -1200,7 +1222,6 @@ export function RegisterMember() {
   const handleEditPersonDateConfirm = () => {
     if (!editingPersonDate) return;
 
-    // ✅ CAMBIO: admin sin restricción de rango
     if (!isAdmin && !isDateInAllowedRange(editPersonTempDate)) {
       toast({
         title: "⚠️ Fecha fuera de rango",
@@ -1255,6 +1276,11 @@ export function RegisterMember() {
   // ============================================
   const handleApplyCoupon = async () => {
     setCouponError("");
+
+    if (coachEnabled && selectedCoachId) {
+      setCouponError("No puedes aplicar cupón cuando hay un couch seleccionado");
+      return;
+    }
 
     if (!user?.idsucursal) {
       setCouponError("No se pudo identificar tu sucursal");
@@ -1322,6 +1348,15 @@ export function RegisterMember() {
   };
 
   const handleManualDiscount = (amount: number) => {
+    if (coachEnabled && selectedCoachId) {
+      toast({
+        title: "Descuento bloqueado",
+        description:
+          "Hay un couch aplicado. Desactívalo para modificar el descuento manualmente.",
+        variant: "default",
+      });
+      return;
+    }
     if (discountLocked) {
       toast({
         title: "Descuento bloqueado",
@@ -1369,6 +1404,10 @@ export function RegisterMember() {
     setEditingPersonDate(null);
     setShowEditPersonDateDialog(false);
     setShowEditPersonCalendar(false);
+    // Coach
+    setCoachEnabled(false);
+    setSelectedCoachId(null);
+    setCoaches([]);
     setResetTrigger((prev) => prev + 1);
   };
 
@@ -1376,6 +1415,21 @@ export function RegisterMember() {
     if (isProcessing) return true;
     if (selectedServices.length === 0) return true;
     if (!cashRegisterOpen) return true;
+    // ✅ Si coach está ON pero no hay coach elegido, no se puede inscribir
+    if (coachEnabled && !selectedCoachId) return true;
+    if (coachEnabled && selectedCoachId) {
+      // Con coach el total es 0, no requiere motivo de descuento ni forma de pago
+      if (hasServicesRequiringPersons && totalPersonsSelected === 0) return true;
+      for (const s of selectedServices) {
+        if (
+          s.requierePersonas > 0 &&
+          totalPersonsSelected < s.requierePersonas
+        ) {
+          return true;
+        }
+      }
+      return false;
+    }
     if (discountAmount > 0 && !discountReason.trim()) return true;
     if (!paymentMethod) return true;
 
@@ -1400,7 +1454,9 @@ export function RegisterMember() {
   // SUBMIT
   // ============================================
   const handleSubmit = async () => {
-    if (!paymentMethod) {
+    const coachActivo = coachEnabled && !!selectedCoachId;
+
+    if (!coachActivo && !paymentMethod) {
       toast({
         title: "⚠️ Método de pago requerido",
         description: "Debes seleccionar un método de pago antes de inscribir.",
@@ -1492,7 +1548,8 @@ export function RegisterMember() {
         servicios: serviciosPayload,
         descuento: discountAmount,
         descripcionDescuento: discountReason,
-        formaPago: paymentMethod,
+        // Si hay coach, la forma de pago no aplica → enviamos "efectivo" (no entra a caja porque total = 0)
+        formaPago: (paymentMethod || "efectivo") as "efectivo" | "qr" | "mixto",
         montoEfectivo: cashAmount,
         montoQr: qrAmount,
         total: total,
@@ -1503,6 +1560,8 @@ export function RegisterMember() {
         montoEntregado: pagoPlazos ? montoEntregado : total,
         montoPendiente: pagoPlazos ? montoPendiente : 0,
         cupon_codigo: appliedCoupon?.codigo || undefined,
+        coach_id:
+          coachEnabled && selectedCoachId ? selectedCoachId : undefined,
       };
 
       const result = await registerMember(registrationData);
@@ -1611,8 +1670,11 @@ export function RegisterMember() {
 
   const submitDisabled = isSubmitDisabled();
 
+  const selectedCoachNombre =
+    coaches.find((c) => c.id === selectedCoachId)?.nombreCompleto || "";
+
   // ============================================
-  // Render fechas por persona (con botón editar condicional)
+  // Render fechas por persona
   // ============================================
   const renderPersonDatesInServiceCard = (service: Service) => {
     const personDates = perPersonDates[service.idServicio];
@@ -1779,9 +1841,41 @@ export function RegisterMember() {
         <div className="flex flex-col">
           <Card className="border-border bg-card shadow-lg">
             <CardHeader className="pb-3 border-b border-border">
-              <CardTitle className="text-lg flex items-center gap-2 text-foreground">
-                <CreditCard className="h-5 w-5" />
-                Resumen de Pago
+              <CardTitle className="text-lg flex items-center justify-between gap-2 text-foreground flex-wrap">
+                <span className="flex items-center gap-2">
+                  <CreditCard className="h-5 w-5" />
+                  Resumen de Pago
+                </span>
+
+                <div className="flex items-center gap-2 text-sm font-normal">
+                  <Switch
+                    checked={coachEnabled}
+                    onCheckedChange={(v) => setCoachEnabled(v)}
+                    disabled={!cashRegisterOpen || loadingCoaches}
+                  />
+                  {coachEnabled ? (
+                    <select
+                      className="bg-input border border-border rounded-md px-2 py-1 text-sm text-foreground max-w-[180px]"
+                      value={selectedCoachId ?? ""}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setSelectedCoachId(v ? Number(v) : null);
+                      }}
+                      disabled={loadingCoaches}
+                    >
+                      <option value="">
+                        {loadingCoaches ? "Cargando..." : "Seleccionar coach"}
+                      </option>
+                      {coaches.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.nombreCompleto}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <span className="text-muted-foreground text-xs">Couch</span>
+                  )}
+                </div>
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-4 space-y-4">
@@ -1835,7 +1929,11 @@ export function RegisterMember() {
                   Cupón de descuento
                 </Label>
 
-                {appliedCoupon ? (
+                {coachEnabled && selectedCoachId ? (
+                  <div className="text-xs text-muted-foreground p-2 rounded-md bg-muted/40">
+                    No disponible cuando hay un couch aplicado.
+                  </div>
+                ) : appliedCoupon ? (
                   <div className="flex items-center justify-between p-3 border rounded-lg">
                     <div className="flex items-center gap-2">
                       <CheckCircle className="h-4 w-4 text-green-600" />
@@ -1872,7 +1970,11 @@ export function RegisterMember() {
                         onKeyDown={(e) =>
                           e.key === "Enter" && handleApplyCoupon()
                         }
-                        disabled={!cashRegisterOpen || isValidatingCoupon}
+                        disabled={
+                          !cashRegisterOpen ||
+                          isValidatingCoupon ||
+                          (coachEnabled && !!selectedCoachId)
+                        }
                         className="flex-1 font-mono"
                       />
                       <Button
@@ -1881,7 +1983,8 @@ export function RegisterMember() {
                         disabled={
                           !couponCode.trim() ||
                           !cashRegisterOpen ||
-                          isValidatingCoupon
+                          isValidatingCoupon ||
+                          (coachEnabled && !!selectedCoachId)
                         }
                         className="bg-primary text-black hover:bg-primary/90"
                       >
@@ -1899,7 +2002,7 @@ export function RegisterMember() {
                 )}
               </div>
 
-              {!appliedCoupon && (
+              {!appliedCoupon && !(coachEnabled && selectedCoachId) && (
                 <div className="space-y-2">
                   <Label className="text-foreground">
                     Descuento adicional (Bs.)
@@ -1944,17 +2047,33 @@ export function RegisterMember() {
                     Bs. {subtotal.toFixed(2)}
                   </span>
                 </div>
-                {discountAmount > 0 && (
-                  <div className="flex justify-between text-sm text-destructive">
-                    <span>Descuento:</span>
-                    <span>- Bs. {discountAmount.toFixed(2)}</span>
+                {coachEnabled && selectedCoachId ? (
+                  <div className="flex justify-between text-sm text-green-600">
+                    <span className="flex items-center gap-1">
+                      <UserCheck className="h-3 w-3" />
+                      Couch ({selectedCoachNombre}) aplicado
+                    </span>
+                    <span>- Bs. {subtotal.toFixed(2)}</span>
                   </div>
+                ) : (
+                  discountAmount > 0 && (
+                    <div className="flex justify-between text-sm text-destructive">
+                      <span>Descuento:</span>
+                      <span>- Bs. {discountAmount.toFixed(2)}</span>
+                    </div>
+                  )
                 )}
                 <Separator className="my-2 bg-border" />
                 <div className="flex justify-between text-lg font-bold">
                   <span className="text-foreground">Total:</span>
                   <span className="text-primary">Bs. {total.toFixed(2)}</span>
                 </div>
+                {coachEnabled && selectedCoachId && (
+                  <div className="text-xs text-green-600 flex items-center gap-1">
+                    <UserCheck className="h-3 w-3" />
+                    Monto a Bs. 0.00 por Couch aplicado
+                  </div>
+                )}
               </div>
 
               <div className="space-y-3 pt-2">
@@ -1964,7 +2083,7 @@ export function RegisterMember() {
                     id="pagoPlazos"
                     checked={pagoPlazos}
                     onChange={(e) => setPagoPlazos(e.target.checked)}
-                    disabled={!cashRegisterOpen}
+                    disabled={!cashRegisterOpen || (coachEnabled && !!selectedCoachId)}
                     className="h-4 w-4 rounded border-border bg-input accent-primary"
                   />
                   <Label
@@ -1976,7 +2095,7 @@ export function RegisterMember() {
                   </Label>
                 </div>
 
-                {pagoPlazos && (
+                {pagoPlazos && !(coachEnabled && selectedCoachId) && (
                   <div className="bg-muted/30 p-3 rounded-md space-y-3 border border-border">
                     <div>
                       <Label className="text-sm text-foreground">
@@ -2021,7 +2140,7 @@ export function RegisterMember() {
                         ? "bg-primary text-black hover:bg-primary/90"
                         : "border-border text-foreground hover:bg-muted"
                     }`}
-                    disabled={!cashRegisterOpen}
+                    disabled={!cashRegisterOpen || (coachEnabled && !!selectedCoachId)}
                   >
                     <Banknote size={18} />
                     <span className="text-xs">Efectivo</span>
@@ -2035,7 +2154,7 @@ export function RegisterMember() {
                         ? "bg-primary text-black hover:bg-primary/90"
                         : "border-border text-foreground hover:bg-muted"
                     }`}
-                    disabled={!cashRegisterOpen}
+                    disabled={!cashRegisterOpen || (coachEnabled && !!selectedCoachId)}
                   >
                     <QrCode size={18} />
                     <span className="text-xs">QR</span>
@@ -2049,49 +2168,50 @@ export function RegisterMember() {
                         ? "bg-primary text-black hover:bg-primary/90"
                         : "border-border text-foreground hover:bg-muted"
                     }`}
-                    disabled={!cashRegisterOpen}
+                    disabled={!cashRegisterOpen || (coachEnabled && !!selectedCoachId)}
                   >
                     <CreditCard size={18} />
                     <span className="text-xs">Mixto</span>
                   </Button>
                 </div>
 
-                {paymentMethod === "mixto" && (
-                  <div className="grid grid-cols-2 gap-3 pt-2">
-                    <div>
-                      <Label className="text-sm text-foreground">
-                        Efectivo
-                      </Label>
-                      <Input
-                        type="number"
-                        min="0"
-                        max={pagoPlazos ? montoEntregado : total}
-                        value={cashAmount || ""}
-                        onChange={(e) => {
-                          const val = parseFloat(e.target.value) || 0;
-                          const maxTotal = pagoPlazos ? montoEntregado : total;
-                          setCashAmount(Math.min(val, maxTotal));
-                          setQrAmount(Math.max(0, maxTotal - val));
-                        }}
-                      />
+                {paymentMethod === "mixto" &&
+                  !(coachEnabled && selectedCoachId) && (
+                    <div className="grid grid-cols-2 gap-3 pt-2">
+                      <div>
+                        <Label className="text-sm text-foreground">
+                          Efectivo
+                        </Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          max={pagoPlazos ? montoEntregado : total}
+                          value={cashAmount || ""}
+                          onChange={(e) => {
+                            const val = parseFloat(e.target.value) || 0;
+                            const maxTotal = pagoPlazos ? montoEntregado : total;
+                            setCashAmount(Math.min(val, maxTotal));
+                            setQrAmount(Math.max(0, maxTotal - val));
+                          }}
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-sm text-foreground">QR</Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          max={pagoPlazos ? montoEntregado : total}
+                          value={qrAmount || ""}
+                          onChange={(e) => {
+                            const val = parseFloat(e.target.value) || 0;
+                            const maxTotal = pagoPlazos ? montoEntregado : total;
+                            setQrAmount(Math.min(val, maxTotal));
+                            setCashAmount(Math.max(0, maxTotal - val));
+                          }}
+                        />
+                      </div>
                     </div>
-                    <div>
-                      <Label className="text-sm text-foreground">QR</Label>
-                      <Input
-                        type="number"
-                        min="0"
-                        max={pagoPlazos ? montoEntregado : total}
-                        value={qrAmount || ""}
-                        onChange={(e) => {
-                          const val = parseFloat(e.target.value) || 0;
-                          const maxTotal = pagoPlazos ? montoEntregado : total;
-                          setQrAmount(Math.min(val, maxTotal));
-                          setCashAmount(Math.max(0, maxTotal - val));
-                        }}
-                      />
-                    </div>
-                  </div>
-                )}
+                  )}
               </div>
 
               {hasServiceWithoutPersons && totalPersonsSelected === 0 && (
@@ -2123,7 +2243,10 @@ export function RegisterMember() {
                       <>
                         <UserPlus size={16} className="mr-2" />
                         Inscribir Cliente - Bs.{" "}
-                        {(pagoPlazos ? montoEntregado : total).toFixed(2)}
+                        {(pagoPlazos && !(coachEnabled && selectedCoachId)
+                          ? montoEntregado
+                          : total
+                        ).toFixed(2)}
                       </>
                     )}
                   </Button>
@@ -2148,21 +2271,30 @@ export function RegisterMember() {
                           <strong className="text-foreground">Total:</strong> Bs.{" "}
                           {total.toFixed(2)}
                         </p>
-                        {discountAmount > 0 && (
-                          <>
-                            <p>
-                              <strong className="text-foreground">
-                                Descuento:
-                              </strong>{" "}
-                              Bs. {discountAmount.toFixed(2)}
-                            </p>
-                            <p>
-                              <strong className="text-foreground">Motivo:</strong>{" "}
-                              {discountReason}
-                            </p>
-                          </>
+                        {coachEnabled && selectedCoachId && (
+                          <p>
+                            <strong className="text-foreground">Couch:</strong>{" "}
+                            {selectedCoachNombre} (monto a Bs. 0.00)
+                          </p>
                         )}
-                        {pagoPlazos && (
+                        {discountAmount > 0 &&
+                          !(coachEnabled && selectedCoachId) && (
+                            <>
+                              <p>
+                                <strong className="text-foreground">
+                                  Descuento:
+                                </strong>{" "}
+                                Bs. {discountAmount.toFixed(2)}
+                              </p>
+                              <p>
+                                <strong className="text-foreground">
+                                  Motivo:
+                                </strong>{" "}
+                                {discountReason}
+                              </p>
+                            </>
+                          )}
+                        {pagoPlazos && !(coachEnabled && selectedCoachId) && (
                           <>
                             <p>
                               <strong className="text-foreground">
