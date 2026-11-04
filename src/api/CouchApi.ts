@@ -120,6 +120,8 @@ export interface CoachUpdateRequest {
   ci: string;
   telefono: string;
   sucursal_id: number;
+  // ✅ Opcional: si viene, se actualiza la meta del mes actual
+  metaInscritos?: number;
 }
 
 export interface RegistroMesRequest {

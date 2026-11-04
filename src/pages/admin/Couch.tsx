@@ -288,10 +288,9 @@ export function Couch() {
       errors.sucursal_id = "La sucursal es obligatoria";
     }
 
-    if (!editingCoach) {
-      if (!formData.metaInscritos || formData.metaInscritos <= 0) {
-        errors.metaInscritos = "Debe indicar una meta mayor a 0";
-      }
+    // ✅ Meta obligatoria tanto en crear como en editar
+    if (!formData.metaInscritos || formData.metaInscritos <= 0) {
+      errors.metaInscritos = "Debe indicar una meta mayor a 0";
     }
 
     setFormErrors(errors);
@@ -311,12 +310,14 @@ export function Couch() {
     setIsConfirming(true);
     try {
       if (editingCoach) {
+        // ✅ En edición también enviamos metaInscritos
         await updateCoach(editingCoach.id, {
           nombres: formData.nombres,
           apellidos: formData.apellidos,
           ci: formData.ci,
           telefono: formData.telefono,
           sucursal_id: formData.sucursal_id,
+          metaInscritos: formData.metaInscritos,
         });
         toast({
           title: "Éxito",
@@ -358,13 +359,17 @@ export function Couch() {
 
   const handleEditCoach = (coach: Coach) => {
     setEditingCoach(coach);
+    // ✅ Tomar la meta del mes seleccionado (o la del coach) para editarla
+    const reg = getRegistro(coach.id);
+    const metaActual = reg?.metaInscritos ?? coach.metaInscritos ?? 10;
+
     setFormData({
       nombres: coach.nombres,
       apellidos: coach.apellidos,
       ci: coach.ci,
       telefono: coach.telefono,
       sucursal_id: coach.sucursalId || 0,
-      metaInscritos: coach.metaInscritos || 10,
+      metaInscritos: metaActual > 0 ? metaActual : 10,
     });
     setFormErrors({});
     setIsDialogOpen(true);
@@ -534,7 +539,7 @@ export function Couch() {
       return `Se registrará a ${formData.nombres} ${formData.apellidos} como coach con meta de ${formData.metaInscritos} inscritos. ¿Deseas continuar?`;
     }
     if (confirmState.action === "update") {
-      return `Se actualizará la información personal de ${formData.nombres} ${formData.apellidos}. ¿Deseas continuar?`;
+      return `Se actualizará la información de ${formData.nombres} ${formData.apellidos}, incluida la meta del mes actual (${formData.metaInscritos} inscritos). ¿Deseas continuar?`;
     }
     if (confirmState.action === "delete" && confirmState.coach) {
       return `Esta acción eliminará permanentemente al coach ${confirmState.coach.nombres} ${confirmState.coach.apellidos}. No se puede deshacer.`;
@@ -587,7 +592,7 @@ export function Couch() {
               </DialogTitle>
               <DialogDescription>
                 {editingCoach
-                  ? "Modifica los datos personales del coach."
+                  ? "Modifica los datos personales del coach y su meta de inscritos del mes actual."
                   : "Completa la información del coach. La meta se registra para el mes actual."}
               </DialogDescription>
             </DialogHeader>
@@ -715,30 +720,35 @@ export function Couch() {
                     )}
                   </div>
 
-                  {!editingCoach && (
-                    <div className="grid gap-1">
-                      <Label>
-                        Meta de inscritos — {formatMes(mesActual())}{" "}
-                        <span className="text-red-500">*</span>
-                      </Label>
-                      <Input
-                        type="number"
-                        min={1}
-                        value={formData.metaInscritos}
-                        onChange={(e) =>
-                          setFormData((p) => ({
-                            ...p,
-                            metaInscritos: parseInt(e.target.value) || 0,
-                          }))
-                        }
-                      />
-                      {formErrors.metaInscritos && (
-                        <p className="text-xs text-destructive">
-                          {formErrors.metaInscritos}
-                        </p>
-                      )}
-                    </div>
-                  )}
+                  {/* ✅ Meta editable tanto en crear como en editar */}
+                  <div className="grid gap-1">
+                    <Label>
+                      Meta de inscritos —{" "}
+                      {editingCoach ? formatMes(mesActual()) : formatMes(mesActual())}{" "}
+                      <span className="text-red-500">*</span>
+                    </Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={formData.metaInscritos}
+                      onChange={(e) =>
+                        setFormData((p) => ({
+                          ...p,
+                          metaInscritos: parseInt(e.target.value) || 0,
+                        }))
+                      }
+                    />
+                    {formErrors.metaInscritos && (
+                      <p className="text-xs text-destructive">
+                        {formErrors.metaInscritos}
+                      </p>
+                    )}
+                    {editingCoach && (
+                      <p className="text-[11px] text-muted-foreground">
+                        Se actualizará la meta de {formatMes(mesActual())}.
+                      </p>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
