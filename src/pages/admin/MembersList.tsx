@@ -1,6 +1,17 @@
 // src/pages/admin/MembersList.tsx
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { Search, Edit, Trash2, Fingerprint, CalendarIcon, ChevronDown, Phone, User, Calendar } from "lucide-react";
+import {
+  Search,
+  Edit,
+  Trash2,
+  Fingerprint,
+  CalendarIcon,
+  ChevronDown,
+  Phone,
+  User,
+  Calendar,
+  UserCog,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -39,7 +50,11 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { format, parseISO as parseISODate } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -52,57 +67,81 @@ import {
   getAvailableServices,
   getAvailableBranches,
   updateServiceDates,
+  getCoachesBySucursal,
+  updateServiceCoach,
   Member,
   Service,
   EditMemberRequest,
+  CoachOption,
 } from "@/api/MemberListapi";
 import { getStoredUserData } from "@/api/loginapi";
 import { useToast } from "@/hooks/use-toast";
 import { useFingerprintEnroll } from "@/hooks/userFingerprintEnroll";
 
 // Componente de calendario simple (sin selector de año) para fechas de servicio
-function SimpleCalendar({ 
-  selected, 
-  onSelect, 
+function SimpleCalendar({
+  selected,
+  onSelect,
   disabled,
-  className 
-}: { 
-  selected?: Date; 
-  onSelect: (date: Date) => void; 
+  className,
+}: {
+  selected?: Date;
+  onSelect: (date: Date) => void;
   disabled?: (date: Date) => boolean;
   className?: string;
 }) {
   const [currentDate, setCurrentDate] = useState(selected || new Date());
-  
-  const months = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+
+  const months = [
+    "Enero",
+    "Febrero",
+    "Marzo",
+    "Abril",
+    "Mayo",
+    "Junio",
+    "Julio",
+    "Agosto",
+    "Septiembre",
+    "Octubre",
+    "Noviembre",
+    "Diciembre",
+  ];
   const weekDays = ["Do", "Lu", "Ma", "Mi", "Ju", "Vi", "Sa"];
-  
+
   const getDaysInMonth = (date: Date) => {
     return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
   };
-  
+
   const getFirstDayOfMonth = (date: Date) => {
     return new Date(date.getFullYear(), date.getMonth(), 1).getDay();
   };
-  
+
   const handlePrevMonth = () => {
-    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
+    setCurrentDate(
+      new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1),
+    );
   };
-  
+
   const handleNextMonth = () => {
-    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
+    setCurrentDate(
+      new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1),
+    );
   };
-  
+
   const handleDateClick = (day: number) => {
-    const newDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
+    const newDate = new Date(
+      currentDate.getFullYear(),
+      currentDate.getMonth(),
+      day,
+    );
     if (!disabled || !disabled(newDate)) {
       onSelect(newDate);
     }
   };
-  
+
   const daysInMonth = getDaysInMonth(currentDate);
   const firstDay = getFirstDayOfMonth(currentDate);
-  
+
   const days = [];
   for (let i = 0; i < firstDay; i++) {
     days.push(null);
@@ -110,35 +149,53 @@ function SimpleCalendar({
   for (let i = 1; i <= daysInMonth; i++) {
     days.push(i);
   }
-  
+
   const isSelectedDate = (day: number) => {
     if (!selected) return false;
-    return selected.getDate() === day && 
-           selected.getMonth() === currentDate.getMonth() && 
-           selected.getFullYear() === currentDate.getFullYear();
+    return (
+      selected.getDate() === day &&
+      selected.getMonth() === currentDate.getMonth() &&
+      selected.getFullYear() === currentDate.getFullYear()
+    );
   };
-  
+
   const isDisabledDate = (day: number) => {
     if (!disabled) return false;
-    const date = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
+    const date = new Date(
+      currentDate.getFullYear(),
+      currentDate.getMonth(),
+      day,
+    );
     return disabled(date);
   };
-  
+
   return (
     <div className={cn("p-3 bg-card", className)}>
       <div className="flex items-center justify-between mb-4">
-        <Button type="button" variant="outline" size="sm" onClick={handlePrevMonth} className="border-border text-foreground">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={handlePrevMonth}
+          className="border-border text-foreground"
+        >
           {"<"}
         </Button>
         <span className="font-medium text-foreground">
           {months[currentDate.getMonth()]} {currentDate.getFullYear()}
         </span>
-        <Button type="button" variant="outline" size="sm" onClick={handleNextMonth} className="border-border text-foreground">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={handleNextMonth}
+          className="border-border text-foreground"
+        >
           {">"}
         </Button>
       </div>
       <div className="grid grid-cols-7 gap-1 text-center mb-2">
-        {weekDays.map(day => (
+        {weekDays.map((day) => (
           <div key={day} className="text-xs font-medium text-muted-foreground">
             {day}
           </div>
@@ -154,9 +211,13 @@ function SimpleCalendar({
                 size="sm"
                 className={cn(
                   "h-8 w-8 p-0 font-normal",
-                  isSelectedDate(day) && "bg-primary text-black hover:bg-primary/90",
-                  isDisabledDate(day) && "opacity-50 cursor-not-allowed text-muted-foreground",
-                  !isSelectedDate(day) && !isDisabledDate(day) && "text-foreground hover:bg-muted"
+                  isSelectedDate(day) &&
+                    "bg-primary text-black hover:bg-primary/90",
+                  isDisabledDate(day) &&
+                    "opacity-50 cursor-not-allowed text-muted-foreground",
+                  !isSelectedDate(day) &&
+                    !isDisabledDate(day) &&
+                    "text-foreground hover:bg-muted",
                 )}
                 onClick={() => !isDisabledDate(day) && handleDateClick(day)}
                 disabled={isDisabledDate(day)}
@@ -183,7 +244,11 @@ const formatDateExact = (dateString: string): string => {
   try {
     const date = new Date(dateString);
     if (isNaN(date.getTime())) return dateString;
-    return `${date.getDate().toString().padStart(2, "0")}/${(date.getMonth() + 1).toString().padStart(2, "0")}/${date.getFullYear()}`;
+    return `${date.getDate().toString().padStart(2, "0")}/${(
+      date.getMonth() + 1
+    )
+      .toString()
+      .padStart(2, "0")}/${date.getFullYear()}`;
   } catch {
     return dateString;
   }
@@ -192,41 +257,54 @@ const formatDateExact = (dateString: string): string => {
 // Función para calcular la edad a partir de la fecha de nacimiento
 const calculateAge = (birthDate: string | null | undefined): number | null => {
   if (!birthDate) return null;
-  
+
   try {
     let birthDateObj: Date;
-    
+
     if (/^\d{4}-\d{2}-\d{2}$/.test(birthDate)) {
       const [year, month, day] = birthDate.split("-");
       birthDateObj = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
     } else {
       birthDateObj = new Date(birthDate);
     }
-    
+
     if (isNaN(birthDateObj.getTime())) return null;
-    
+
     const today = new Date();
     let age = today.getFullYear() - birthDateObj.getFullYear();
     const monthDiff = today.getMonth() - birthDateObj.getMonth();
-    
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDateObj.getDate())) {
+
+    if (
+      monthDiff < 0 ||
+      (monthDiff === 0 && today.getDate() < birthDateObj.getDate())
+    ) {
       age--;
     }
-    
+
     return age;
   } catch {
     return null;
   }
 };
 
-const MemberServices: React.FC<{ 
-  services: Service[]; 
+const MemberServices: React.FC<{
+  services: Service[];
   onEditDates?: (service: Service) => void;
+  onEditCoach?: (service: Service) => void;
   canEdit?: boolean;
-}> = ({ services, onEditDates, canEdit = false }) => {
+  canEditCoach?: boolean;
+}> = ({
+  services,
+  onEditDates,
+  onEditCoach,
+  canEdit = false,
+  canEditCoach = false,
+}) => {
   const isExpired = (expirationDate: string) => {
     const today = new Date();
-    const todayStr = `${today.getFullYear()}-${(today.getMonth() + 1).toString().padStart(2, "0")}-${today.getDate().toString().padStart(2, "0")}`;
+    const todayStr = `${today.getFullYear()}-${(today.getMonth() + 1)
+      .toString()
+      .padStart(2, "0")}-${today.getDate().toString().padStart(2, "0")}`;
     return expirationDate < todayStr;
   };
 
@@ -260,6 +338,7 @@ const MemberServices: React.FC<{
         const noEntries = hasNoEntries(service.ingresos_disponibles);
         const isInactive = service.status === "inactive";
         const canEditThisService = canEdit && !!onEditDates;
+        const canEditThisCoach = canEditCoach && !!onEditCoach;
 
         return (
           <div key={index} className="p-2 bg-muted/30 rounded">
@@ -269,13 +348,27 @@ const MemberServices: React.FC<{
                 <div className="text-xs space-y-0.5 mt-1">
                   <div>
                     <span className="text-muted-foreground">Inicio: </span>
-                    <span className={noEntries || expired || isInactive ? "text-red-600 font-medium" : "text-muted-foreground"}>
-                      {service.startDate ? formatDateExact(service.startDate) : "—"}
+                    <span
+                      className={
+                        noEntries || expired || isInactive
+                          ? "text-red-600 font-medium"
+                          : "text-muted-foreground"
+                      }
+                    >
+                      {service.startDate
+                        ? formatDateExact(service.startDate)
+                        : "—"}
                     </span>
                   </div>
                   <div>
                     <span className="text-muted-foreground">Vence: </span>
-                    <span className={noEntries || expired || isInactive ? "text-red-600 font-medium" : "text-muted-foreground"}>
+                    <span
+                      className={
+                        noEntries || expired || isInactive
+                          ? "text-red-600 font-medium"
+                          : "text-muted-foreground"
+                      }
+                    >
                       {formatDateExact(service.expirationDate)}
                     </span>
                   </div>
@@ -313,6 +406,36 @@ const MemberServices: React.FC<{
                 </span>
               )}
             </div>
+
+            {/* ✅ Coach de la inscripción */}
+            <div className="flex items-center justify-between mt-2 pt-2 border-t border-border/60">
+              <div className="flex items-center gap-1 text-xs">
+                <UserCog className="h-3 w-3 text-muted-foreground" />
+                <span className="text-muted-foreground">Coach:</span>
+                {service.coachId ? (
+                  <Badge
+                    variant="outline"
+                    className="text-[10px] px-1.5 py-0 bg-primary/10 border-primary/40 text-foreground"
+                  >
+                    {service.coachNombre || `ID ${service.coachId}`}
+                  </Badge>
+                ) : (
+                  <span className="text-muted-foreground italic">Sin coach</span>
+                )}
+              </div>
+              {canEditThisCoach && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => onEditCoach!(service)}
+                  className="h-6 px-2 text-[11px]"
+                  title="Editar coach"
+                >
+                  <Edit className="h-3 w-3 mr-1" />
+                  {service.coachId ? "Cambiar" : "Asignar"}
+                </Button>
+              )}
+            </div>
           </div>
         );
       })}
@@ -321,22 +444,34 @@ const MemberServices: React.FC<{
 };
 
 // Componente de tarjeta para vista móvil
-const MemberCard: React.FC<{ 
-  member: Member; 
+const MemberCard: React.FC<{
+  member: Member;
   getSucursalName: (id: string) => string;
   onEdit: () => void;
   onEditServiceDates?: (service: Service) => void;
-  onDelete?: () => void;  // ✅ ahora opcional (solo admin)
+  onEditServiceCoach?: (service: Service) => void;
+  onDelete?: () => void;
   loading: boolean;
   canEditDates: boolean;
-}> = ({ member, getSucursalName, onEdit, onEditServiceDates, onDelete, loading, canEditDates }) => {
+  canEditCoach: boolean;
+}> = ({
+  member,
+  getSucursalName,
+  onEdit,
+  onEditServiceDates,
+  onEditServiceCoach,
+  onDelete,
+  loading,
+  canEditDates,
+  canEditCoach,
+}) => {
   const sucursalesToShow =
     member.sucursales && member.sucursales.length > 0
       ? member.sucursales
       : member.sucursal
         ? [member.sucursal]
         : [];
-  
+
   return (
     <Card className="mb-4 overflow-hidden">
       <CardContent className="p-4">
@@ -378,10 +513,12 @@ const MemberCard: React.FC<{
 
         <div className="mt-3">
           <p className="text-sm text-muted-foreground mb-2">Servicios activos:</p>
-          <MemberServices 
-            services={member.services} 
+          <MemberServices
+            services={member.services}
             onEditDates={canEditDates ? onEditServiceDates : undefined}
+            onEditCoach={canEditCoach ? onEditServiceCoach : undefined}
             canEdit={canEditDates}
+            canEditCoach={canEditCoach}
           />
         </div>
 
@@ -396,7 +533,6 @@ const MemberCard: React.FC<{
             <Edit className="h-4 w-4 mr-1" />
             Editar
           </Button>
-          {/* ✅ Botón eliminar SOLO si onDelete está definido (admin) */}
           {onDelete && (
             <Button
               variant="outline"
@@ -438,15 +574,26 @@ export function MembersList() {
   const [memberToDelete, setMemberToDelete] = useState<string | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [fingerprintDialogOpen, setFingerprintDialogOpen] = useState(false);
-  const [editServiceDatesDialogOpen, setEditServiceDatesDialogOpen] = useState(false);
+  const [editServiceDatesDialogOpen, setEditServiceDatesDialogOpen] =
+    useState(false);
+  const [editServiceCoachDialogOpen, setEditServiceCoachDialogOpen] =
+    useState(false);
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [memberToEdit, setMemberToEdit] = useState<Member | null>(null);
-  const [serviceToEditDates, setServiceToEditDates] = useState<Service | null>(null);
+  const [serviceToEditDates, setServiceToEditDates] = useState<Service | null>(
+    null,
+  );
+  const [serviceToEditCoach, setServiceToEditCoach] = useState<Service | null>(
+    null,
+  );
   const [editServiceDatesData, setEditServiceDatesData] = useState({
     startDate: "",
     expirationDate: "",
   });
-  // ✅ Sin birthDate
+  const [coachOptions, setCoachOptions] = useState<CoachOption[]>([]);
+  const [loadingCoaches, setLoadingCoaches] = useState(false);
+  const [savingCoach, setSavingCoach] = useState(false);
+  const [selectedCoachId, setSelectedCoachId] = useState<string>("none");
   const [editFormData, setEditFormData] = useState({
     nombres: "",
     apellidos: "",
@@ -461,22 +608,20 @@ export function MembersList() {
   const { toast } = useToast();
   const userData = getStoredUserData();
   const dataInitialized = useRef(false);
-  // ✅ FIX: usar ReturnType<typeof setTimeout> en lugar de NodeJS.Timeout
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const isEditingRef = useRef(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const skipPageEffectRef = useRef(true);
 
-  // ✅ Permiso unificado: admin Y recepcionista pueden editar fechas
   const canEditDates =
     userData?.rol === "admin" || userData?.rol === "recepcionista";
-
-  // ✅ NUEVO: solo admin puede eliminar miembros
+  const canEditCoach =
+    userData?.rol === "admin" || userData?.rol === "recepcionista";
   const canDeleteMembers = userData?.rol === "admin";
 
   const { startEnroll } = useFingerprintEnroll({
-    onSuccess: (data) => {
+    onSuccess: () => {
       setIsScanning(false);
       setFingerprintDialogOpen(false);
       setRegisterFingerprint(false);
@@ -486,7 +631,7 @@ export function MembersList() {
       });
       loadMembers();
     },
-    onError: (error) => {
+    onError: () => {
       setIsScanning(false);
       toast({
         title: "❌ Error",
@@ -496,12 +641,11 @@ export function MembersList() {
     },
   });
 
-  // ✅ Pausar/reanudar el lector global mientras el modal de enrolamiento está abierto
   useEffect(() => {
     const paused = !!fingerprintDialogOpen;
     (window as any).__FINGERPRINT_PAUSED__ = paused;
     window.dispatchEvent(
-      new CustomEvent("fingerprint-pause-changed", { detail: { paused } })
+      new CustomEvent("fingerprint-pause-changed", { detail: { paused } }),
     );
 
     return () => {
@@ -509,19 +653,15 @@ export function MembersList() {
       window.dispatchEvent(
         new CustomEvent("fingerprint-pause-changed", {
           detail: { paused: false },
-        })
+        }),
       );
     };
   }, [fingerprintDialogOpen]);
 
-  // ✅ Cuando el modal de enrolamiento se abre, arrancar el enroll
   useEffect(() => {
     if (!fingerprintDialogOpen || !memberToEdit) return;
 
-    console.log("⏳ [MembersList] Esperando a que el SSE global se cierre...");
-
     const timer = setTimeout(() => {
-      console.log("🎯 [MembersList] startEnroll con userId:", memberToEdit.id);
       setIsScanning(true);
       startEnroll(memberToEdit.id);
     }, 1500);
@@ -530,15 +670,12 @@ export function MembersList() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fingerprintDialogOpen, memberToEdit]);
 
-  // Función para obtener el nombre de la sucursal por ID
   const getSucursalName = (sucursalId: string): string => {
     if (!sucursalId) return "Sin sucursal";
-
     const branch = availableBranches.find((b) => b.id === sucursalId);
     return branch ? branch.name : sucursalId;
   };
 
-  // Cargar miembros - función memoizada
   const loadMembers = useCallback(
     async (page = 1, search = "") => {
       try {
@@ -559,15 +696,12 @@ export function MembersList() {
           sucursalFilter,
         );
 
-        // ✅ Detectar rol y sucursal del usuario
         const isAdmin = userData?.rol === "admin";
         const mySucursal = userData?.idsucursal?.toString();
 
-        // ✅ Agrupar por persona (id) combinando sucursales
         const groupedMap = new Map<string, Member & { sucursales: string[] }>();
 
         data.members.forEach((member) => {
-          // ✅ Si NO es admin y esta persona no pertenece a su sucursal, ignorar
           if (!isAdmin && mySucursal && member.sucursal !== mySucursal) {
             return;
           }
@@ -582,6 +716,7 @@ export function MembersList() {
             member.services.forEach((newSvc) => {
               const dup = existing.services.find(
                 (s) =>
+                  s.inscripcionId === newSvc.inscripcionId &&
                   s.name === newSvc.name &&
                   s.startDate === newSvc.startDate &&
                   s.expirationDate === newSvc.expirationDate &&
@@ -601,22 +736,12 @@ export function MembersList() {
 
         const uniqueMembers = Array.from(groupedMap.values());
 
-        console.log(
-          "🔍 Miembros agrupados (página " + page + "):",
-          uniqueMembers.map((m) => ({
-            id: m.id,
-            name: m.name,
-            sucursales: m.sucursales,
-          })),
-        );
-
         setMembers(uniqueMembers);
         setFilteredMembers(uniqueMembers);
         setTotalPages(data.totalPages);
         setTotalCount(data.totalCount);
       } catch (error: any) {
         if (error.name === "AbortError") {
-          console.log("Petición cancelada");
           return;
         }
 
@@ -630,10 +755,10 @@ export function MembersList() {
         setLoading(false);
       }
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [itemsPerPage, serviceFilter, sucursalFilter],
   );
 
-  // ✅ useEffect para manejar búsquedas (con debounce)
   useEffect(() => {
     if (!dataInitialized.current) return;
     if (isEditingRef.current) return;
@@ -658,7 +783,6 @@ export function MembersList() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchTerm, serviceFilter, sucursalFilter]);
 
-  // ✅ useEffect para cargar cuando cambia la página
   useEffect(() => {
     if (skipPageEffectRef.current) {
       skipPageEffectRef.current = false;
@@ -671,12 +795,10 @@ export function MembersList() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPage]);
 
-  // ✅ Mantener el input de página sincronizado con la página actual
   useEffect(() => {
     setPageInput(currentPage.toString());
   }, [currentPage]);
 
-  // Cargar datos iniciales solo una vez
   useEffect(() => {
     const initializeData = async () => {
       try {
@@ -724,7 +846,9 @@ export function MembersList() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Abrir diálogo para editar fechas de un servicio
+  // ============================================
+  // Editar fechas
+  // ============================================
   const handleEditServiceDates = (member: Member, service: Service) => {
     setSelectedMember(member);
     setServiceToEditDates(service);
@@ -735,12 +859,14 @@ export function MembersList() {
     setEditServiceDatesDialogOpen(true);
   };
 
-  // Guardar cambios de fechas del servicio
   const handleSaveServiceDates = async () => {
     if (!selectedMember || !serviceToEditDates) return;
 
     try {
-      if (!editServiceDatesData.startDate || !editServiceDatesData.expirationDate) {
+      if (
+        !editServiceDatesData.startDate ||
+        !editServiceDatesData.expirationDate
+      ) {
         toast({
           title: "❌ Datos incompletos",
           description: "Debes seleccionar ambas fechas",
@@ -775,9 +901,78 @@ export function MembersList() {
     }
   };
 
-  // Manejar eliminación de miembro
+  // ============================================
+  // Editar coach
+  // ============================================
+  const handleEditServiceCoach = async (member: Member, service: Service) => {
+    setSelectedMember(member);
+    setServiceToEditCoach(service);
+    setSelectedCoachId(service.coachId ? service.coachId.toString() : "none");
+    setCoachOptions([]);
+    setEditServiceCoachDialogOpen(true);
+
+    try {
+      setLoadingCoaches(true);
+      const sucursalNum = Number(service.sucursalId || member.sucursal);
+      if (!sucursalNum || isNaN(sucursalNum)) {
+        throw new Error("No se pudo determinar la sucursal");
+      }
+      const coaches = await getCoachesBySucursal(sucursalNum);
+      setCoachOptions(coaches);
+    } catch (error: any) {
+      console.error("Error cargando coaches:", error);
+      toast({
+        title: "❌ Error",
+        description: error.message || "No se pudieron cargar los coaches",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingCoaches(false);
+    }
+  };
+
+  const handleSaveServiceCoach = async () => {
+    if (!selectedMember || !serviceToEditCoach) return;
+
+    try {
+      setSavingCoach(true);
+      const newCoachId =
+        selectedCoachId === "none" ? null : Number(selectedCoachId);
+
+      await updateServiceCoach(
+        selectedMember.id,
+        serviceToEditCoach.inscripcionId,
+        newCoachId,
+      );
+
+      toast({
+        title: "✅ Coach actualizado",
+        description: newCoachId
+          ? "El coach fue asignado correctamente a la inscripción"
+          : "Se quitó el coach de la inscripción",
+      });
+
+      setEditServiceCoachDialogOpen(false);
+      setServiceToEditCoach(null);
+      setSelectedMember(null);
+      setSelectedCoachId("none");
+      loadMembers(currentPage, searchTerm);
+    } catch (error: any) {
+      console.error("Error actualizando coach:", error);
+      toast({
+        title: "❌ Error",
+        description: error.message || "Error al actualizar el coach",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingCoach(false);
+    }
+  };
+
+  // ============================================
+  // Eliminar miembro
+  // ============================================
   const handleDelete = async () => {
-    // ✅ Solo admin puede eliminar
     if (!canDeleteMembers) {
       toast({
         title: "No autorizado",
@@ -808,16 +1003,18 @@ export function MembersList() {
     }
   };
 
-  // Editar miembro
+  // ============================================
+  // Editar miembro (datos personales)
+  // ============================================
   const handleEditMember = (member: Member) => {
     isEditingRef.current = true;
 
     setMemberToEdit(member);
     const nameParts = member.name.trim().split(/\s+/);
-    const apellidos = nameParts.length > 1 ? nameParts[nameParts.length - 1] : "";
+    const apellidos =
+      nameParts.length > 1 ? nameParts[nameParts.length - 1] : "";
     const nombres = nameParts.slice(0, -1).join(" ");
 
-    // ✅ Sin birthDate
     setEditFormData({
       nombres: nombres,
       apellidos: apellidos,
@@ -828,7 +1025,6 @@ export function MembersList() {
     setEditDialogOpen(true);
   };
 
-  // Manejar cambio en el formulario de edición
   const handleEditFormChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setEditFormData((prev) => ({
@@ -837,7 +1033,6 @@ export function MembersList() {
     }));
   };
 
-  // Manejar cambio de fecha de inicio del servicio
   const handleStartDateChange = (date: Date | undefined) => {
     if (date) {
       const year = date.getFullYear();
@@ -852,7 +1047,6 @@ export function MembersList() {
     setStartDateCalendarOpen(false);
   };
 
-  // Manejar cambio de fecha de vencimiento del servicio
   const handleEndDateChange = (date: Date | undefined) => {
     if (date) {
       const year = date.getFullYear();
@@ -867,7 +1061,6 @@ export function MembersList() {
     setEndDateCalendarOpen(false);
   };
 
-  // Guardar cambios del miembro editado
   const handleSaveEdit = async () => {
     if (!memberToEdit) return;
 
@@ -896,7 +1089,6 @@ export function MembersList() {
         return;
       }
 
-      // ✅ Payload explícito sin birthDate
       const payload: EditMemberRequest = {
         nombres: editFormData.nombres,
         apellidos: editFormData.apellidos,
@@ -931,7 +1123,6 @@ export function MembersList() {
     }
   };
 
-  // Cancelar edición
   const handleCancelEdit = () => {
     setEditDialogOpen(false);
     setMemberToEdit(null);
@@ -945,7 +1136,6 @@ export function MembersList() {
     isEditingRef.current = false;
   };
 
-  // Handler para cambio de filtro
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setSearchTerm(value);
@@ -959,13 +1149,11 @@ export function MembersList() {
     setSucursalFilter(value);
   };
 
-  // Función para cambiar de página
   const handlePageChange = (page: number) => {
     if (page < 1 || page > totalPages) return;
     setCurrentPage(page);
   };
 
-  // Manejar el input de página
   const handlePageInputSubmit = () => {
     const num = parseInt(pageInput);
     if (!isNaN(num) && num >= 1 && num <= totalPages) {
@@ -1070,16 +1258,20 @@ export function MembersList() {
             className="pl-10"
           />
         </div>
-        
+
         <Button
           variant="outline"
           onClick={() => setShowMobileFilters(!showMobileFilters)}
           className="w-full flex items-center justify-between"
         >
           <span>Filtros</span>
-          <ChevronDown className={`h-4 w-4 transition-transform ${showMobileFilters ? "rotate-180" : ""}`} />
+          <ChevronDown
+            className={`h-4 w-4 transition-transform ${
+              showMobileFilters ? "rotate-180" : ""
+            }`}
+          />
         </Button>
-        
+
         {showMobileFilters && (
           <Card>
             <CardContent className="pt-4 space-y-3">
@@ -1131,7 +1323,7 @@ export function MembersList() {
             </CardContent>
           </Card>
         )}
-        
+
         <p className="text-xs text-muted-foreground text-center">
           Escribe al menos 3 caracteres para buscar
         </p>
@@ -1203,7 +1395,10 @@ export function MembersList() {
                       <TableCell>{member.phone}</TableCell>
                       <TableCell>
                         {age !== null ? (
-                          <Badge variant="secondary" className="whitespace-nowrap">
+                          <Badge
+                            variant="secondary"
+                            className="whitespace-nowrap"
+                          >
                             {age} años
                           </Badge>
                         ) : (
@@ -1212,7 +1407,10 @@ export function MembersList() {
                       </TableCell>
                       <TableCell>
                         {sucursalesToShow.length > 0 ? (
-                          <Badge variant="outline" className="whitespace-nowrap">
+                          <Badge
+                            variant="outline"
+                            className="whitespace-nowrap"
+                          >
                             {sucursalesToShow
                               .map((s) => getSucursalName(s))
                               .join(" / ")}
@@ -1222,10 +1420,22 @@ export function MembersList() {
                         )}
                       </TableCell>
                       <TableCell className="max-w-xs">
-                        <MemberServices 
-                          services={member.services} 
-                          onEditDates={canEditDates ? (service) => handleEditServiceDates(member, service) : undefined}
+                        <MemberServices
+                          services={member.services}
+                          onEditDates={
+                            canEditDates
+                              ? (service) =>
+                                  handleEditServiceDates(member, service)
+                              : undefined
+                          }
+                          onEditCoach={
+                            canEditCoach
+                              ? (service) =>
+                                  handleEditServiceCoach(member, service)
+                              : undefined
+                          }
                           canEdit={canEditDates}
+                          canEditCoach={canEditCoach}
                         />
                       </TableCell>
                       <TableCell className="w-[100px]">
@@ -1253,7 +1463,6 @@ export function MembersList() {
                           >
                             <Edit className="h-4 w-4" />
                           </Button>
-                          {/* ✅ Botón eliminar SOLO admin */}
                           {canDeleteMembers && (
                             <Button
                               variant="ghost"
@@ -1317,14 +1526,27 @@ export function MembersList() {
               member={member}
               getSucursalName={getSucursalName}
               onEdit={() => handleEditMember(member)}
-              onEditServiceDates={canEditDates ? (service) => handleEditServiceDates(member, service) : undefined}
-              // ✅ Solo admin recibe handler de eliminar
-              onDelete={canDeleteMembers ? () => {
-                setMemberToDelete(member.id);
-                setDeleteDialogOpen(true);
-              } : undefined}
+              onEditServiceDates={
+                canEditDates
+                  ? (service) => handleEditServiceDates(member, service)
+                  : undefined
+              }
+              onEditServiceCoach={
+                canEditCoach
+                  ? (service) => handleEditServiceCoach(member, service)
+                  : undefined
+              }
+              onDelete={
+                canDeleteMembers
+                  ? () => {
+                      setMemberToDelete(member.id);
+                      setDeleteDialogOpen(true);
+                    }
+                  : undefined
+              }
               loading={loading}
               canEditDates={canEditDates}
+              canEditCoach={canEditCoach}
             />
           ))
         )}
@@ -1360,7 +1582,9 @@ export function MembersList() {
               className="w-16 h-8 text-center"
               disabled={loading}
             />
-            <span className="text-sm text-muted-foreground">de {totalPages}</span>
+            <span className="text-sm text-muted-foreground">
+              de {totalPages}
+            </span>
           </div>
 
           <Button
@@ -1374,7 +1598,7 @@ export function MembersList() {
         </div>
       )}
 
-      {/* Diálogo de confirmación para eliminar */}
+      {/* Diálogo eliminar */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent className="w-[95vw] max-w-md rounded-lg">
           <AlertDialogHeader>
@@ -1402,7 +1626,7 @@ export function MembersList() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Diálogo para editar miembro (SIN fecha de nacimiento) */}
+      {/* Diálogo editar miembro */}
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
         <DialogContent className="max-w-md w-[95vw] rounded-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -1518,13 +1742,17 @@ export function MembersList() {
         </DialogContent>
       </Dialog>
 
-      {/* Diálogo para editar fechas de servicio */}
-      <Dialog open={editServiceDatesDialogOpen} onOpenChange={setEditServiceDatesDialogOpen}>
+      {/* Diálogo editar fechas */}
+      <Dialog
+        open={editServiceDatesDialogOpen}
+        onOpenChange={setEditServiceDatesDialogOpen}
+      >
         <DialogContent className="max-w-md w-[95vw] rounded-lg">
           <DialogHeader>
             <DialogTitle>Editar Fechas del Servicio</DialogTitle>
             <DialogDescription>
-              Modifica las fechas de inicio y vencimiento para {serviceToEditDates?.name}
+              Modifica las fechas de inicio y vencimiento para{" "}
+              {serviceToEditDates?.name}
             </DialogDescription>
           </DialogHeader>
 
@@ -1535,18 +1763,26 @@ export function MembersList() {
                   <CalendarIcon className="h-4 w-4" />
                   Fecha de Inicio
                 </Label>
-                <Popover open={startDateCalendarOpen} onOpenChange={setStartDateCalendarOpen}>
+                <Popover
+                  open={startDateCalendarOpen}
+                  onOpenChange={setStartDateCalendarOpen}
+                >
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
                       className={cn(
                         "w-full justify-start text-left font-normal",
-                        !editServiceDatesData.startDate && "text-muted-foreground"
+                        !editServiceDatesData.startDate &&
+                          "text-muted-foreground",
                       )}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
                       {editServiceDatesData.startDate ? (
-                        format(parseISODate(editServiceDatesData.startDate), "dd/MM/yyyy", { locale: es })
+                        format(
+                          parseISODate(editServiceDatesData.startDate),
+                          "dd/MM/yyyy",
+                          { locale: es },
+                        )
                       ) : (
                         <span>Seleccionar fecha</span>
                       )}
@@ -1554,7 +1790,11 @@ export function MembersList() {
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
                     <SimpleCalendar
-                      selected={editServiceDatesData.startDate ? parseISODate(editServiceDatesData.startDate) : undefined}
+                      selected={
+                        editServiceDatesData.startDate
+                          ? parseISODate(editServiceDatesData.startDate)
+                          : undefined
+                      }
                       onSelect={(date) => handleStartDateChange(date)}
                     />
                   </PopoverContent>
@@ -1566,18 +1806,26 @@ export function MembersList() {
                   <CalendarIcon className="h-4 w-4" />
                   Fecha de Vencimiento
                 </Label>
-                <Popover open={endDateCalendarOpen} onOpenChange={setEndDateCalendarOpen}>
+                <Popover
+                  open={endDateCalendarOpen}
+                  onOpenChange={setEndDateCalendarOpen}
+                >
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
                       className={cn(
                         "w-full justify-start text-left font-normal",
-                        !editServiceDatesData.expirationDate && "text-muted-foreground"
+                        !editServiceDatesData.expirationDate &&
+                          "text-muted-foreground",
                       )}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
                       {editServiceDatesData.expirationDate ? (
-                        format(parseISODate(editServiceDatesData.expirationDate), "dd/MM/yyyy", { locale: es })
+                        format(
+                          parseISODate(editServiceDatesData.expirationDate),
+                          "dd/MM/yyyy",
+                          { locale: es },
+                        )
                       ) : (
                         <span>Seleccionar fecha</span>
                       )}
@@ -1585,7 +1833,11 @@ export function MembersList() {
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
                     <SimpleCalendar
-                      selected={editServiceDatesData.expirationDate ? parseISODate(editServiceDatesData.expirationDate) : undefined}
+                      selected={
+                        editServiceDatesData.expirationDate
+                          ? parseISODate(editServiceDatesData.expirationDate)
+                          : undefined
+                      }
                       onSelect={(date) => handleEndDateChange(date)}
                     />
                   </PopoverContent>
@@ -1611,7 +1863,77 @@ export function MembersList() {
         </DialogContent>
       </Dialog>
 
-      {/* Diálogo para registrar huella dactilar */}
+      {/* Diálogo editar coach de inscripción */}
+      <Dialog
+        open={editServiceCoachDialogOpen}
+        onOpenChange={setEditServiceCoachDialogOpen}
+      >
+        <DialogContent className="max-w-md w-[95vw] rounded-lg">
+          <DialogHeader>
+            <DialogTitle>Editar Coach de la Inscripción</DialogTitle>
+            <DialogDescription>
+              {serviceToEditCoach
+                ? `Servicio: ${serviceToEditCoach.name}`
+                : "Selecciona el coach a asignar"}
+            </DialogDescription>
+          </DialogHeader>
+
+          {serviceToEditCoach && (
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>Coach</Label>
+                {loadingCoaches ? (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                    Cargando coaches...
+                  </div>
+                ) : (
+                  <Select
+                    value={selectedCoachId}
+                    onValueChange={setSelectedCoachId}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccione un coach" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Sin coach</SelectItem>
+                      {coachOptions.map((coach) => (
+                        <SelectItem key={coach.id} value={coach.id.toString()}>
+                          {coach.nombreCompleto}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                {!loadingCoaches && coachOptions.length === 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    No hay coaches registrados en esta sucursal.
+                  </p>
+                )}
+              </div>
+
+              <div className="flex flex-col sm:flex-row justify-end gap-2 pt-4">
+                <Button
+                  variant="outline"
+                  onClick={() => setEditServiceCoachDialogOpen(false)}
+                  disabled={savingCoach}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={handleSaveServiceCoach}
+                  disabled={savingCoach || loadingCoaches}
+                  className="bg-primary text-black hover:bg-primary/90"
+                >
+                  {savingCoach ? "Guardando..." : "Guardar Cambios"}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Diálogo huella */}
       <Dialog
         open={fingerprintDialogOpen}
         onOpenChange={(open) => {
@@ -1634,11 +1956,17 @@ export function MembersList() {
 
           <div className="text-center py-6">
             <div
-              className={`mx-auto w-32 h-32 sm:w-48 sm:h-48 rounded-full border-4 ${isScanning ? "border-primary animate-pulse" : "border-gray-300"} flex items-center justify-center mb-4`}
+              className={`mx-auto w-32 h-32 sm:w-48 sm:h-48 rounded-full border-4 ${
+                isScanning
+                  ? "border-primary animate-pulse"
+                  : "border-gray-300"
+              } flex items-center justify-center mb-4`}
             >
               <Fingerprint
                 size={64}
-                className={`sm:w-24 sm:h-24 ${isScanning ? "text-primary" : "text-gray-400"}`}
+                className={`sm:w-24 sm:h-24 ${
+                  isScanning ? "text-primary" : "text-gray-400"
+                }`}
               />
             </div>
 

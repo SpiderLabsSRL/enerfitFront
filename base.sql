@@ -43,11 +43,12 @@ CREATE TABLE personas (
 
 -- ============================================================
 -- 3. EMPLEADOS
+--    (rol incluye 'lactobar' y 'couch' tras migración)
 -- ============================================================
 CREATE TABLE empleados (
     id SERIAL PRIMARY KEY,
     persona_id INTEGER NOT NULL,
-    rol VARCHAR(20) CHECK (rol IN ('admin', 'recepcionista', 'entrenador', 'limpieza')),
+    rol VARCHAR(20) CHECK (rol IN ('admin', 'recepcionista', 'entrenador', 'limpieza', 'lactobar', 'couch')),
     sucursal_id INTEGER NULL,
     sueldo DECIMAL(10, 2) DEFAULT 0,
     comision DECIMAL(10, 2) DEFAULT NULL,
@@ -77,7 +78,7 @@ CREATE TABLE horarios_empleado (
 CREATE TABLE cajas (
     id SERIAL PRIMARY KEY,
     nombre VARCHAR(50) NOT NULL,
-    estado_caja VARCHAR(20) DEFAULT 'cerrada' 
+    estado_caja VARCHAR(20) DEFAULT 'cerrada'
         CHECK (estado_caja IN ('abierta', 'cerrada')),
     total DECIMAL(10,2) DEFAULT 0,
     sucursal_id INTEGER NOT NULL,
@@ -252,7 +253,6 @@ CREATE TABLE movimientos_stock (
 
 -- ============================================================
 -- 17. CUPONES
---     (incluye empleado_id opcional, ON DELETE SET NULL)
 -- ============================================================
 CREATE TABLE cupones (
     id SERIAL PRIMARY KEY,
@@ -273,6 +273,9 @@ CREATE TABLE cupones (
     FOREIGN KEY (empleado_id) REFERENCES empleados(id) ON DELETE SET NULL
 );
 
+-- ============================================================
+-- 18. CUPÓN POR SUCURSAL
+-- ============================================================
 CREATE TABLE cupon_sucursal (
     id SERIAL PRIMARY KEY,
     cupon_id INTEGER NOT NULL,
@@ -283,7 +286,7 @@ CREATE TABLE cupon_sucursal (
 );
 
 -- ============================================================
--- 18. VENTAS DE SERVICIOS
+-- 19. VENTAS DE SERVICIOS
 -- ============================================================
 CREATE TABLE ventas_servicios (
     id SERIAL PRIMARY KEY,
@@ -306,17 +309,24 @@ CREATE TABLE ventas_servicios (
     FOREIGN KEY (caja_id) REFERENCES cajas(id) ON DELETE RESTRICT
 );
 
+-- ============================================================
+-- 20. DETALLE DE VENTA DE SERVICIOS
+--     (incluye coach_id con trigger de validación rol='couch')
+-- ============================================================
 CREATE TABLE detalle_venta_servicios (
     id SERIAL PRIMARY KEY,
     venta_servicio_id INTEGER NOT NULL,
     inscripcion_id INTEGER NOT NULL,
     precio DECIMAL(15, 2) NOT NULL,
+    coach_id INTEGER NULL,
     FOREIGN KEY (venta_servicio_id) REFERENCES ventas_servicios(id) ON DELETE CASCADE,
-    FOREIGN KEY (inscripcion_id) REFERENCES inscripciones(id) ON DELETE RESTRICT
+    FOREIGN KEY (inscripcion_id) REFERENCES inscripciones(id) ON DELETE RESTRICT,
+    CONSTRAINT detalle_venta_servicios_coach_id_fkey
+        FOREIGN KEY (coach_id) REFERENCES empleados(id) ON DELETE SET NULL
 );
 
 -- ============================================================
--- 19. VENTAS DE PRODUCTOS
+-- 21. VENTAS DE PRODUCTOS
 -- ============================================================
 CREATE TABLE ventas_productos (
     id SERIAL PRIMARY KEY,
@@ -337,6 +347,9 @@ CREATE TABLE ventas_productos (
     FOREIGN KEY (caja_id) REFERENCES cajas(id) ON DELETE RESTRICT
 );
 
+-- ============================================================
+-- 22. DETALLE DE VENTA DE PRODUCTOS
+-- ============================================================
 CREATE TABLE detalle_venta_productos (
     id SERIAL PRIMARY KEY,
     venta_producto_id INTEGER NOT NULL,
@@ -349,7 +362,7 @@ CREATE TABLE detalle_venta_productos (
 );
 
 -- ============================================================
--- 20. MOVIMIENTOS DE CAJA
+-- 23. MOVIMIENTOS DE CAJA
 -- ============================================================
 CREATE TABLE movimientos_caja (
     id SERIAL PRIMARY KEY,
@@ -370,7 +383,7 @@ CREATE TABLE movimientos_caja (
 );
 
 -- ============================================================
--- 21. REGISTROS DE ACCESO
+-- 24. REGISTROS DE ACCESO
 -- ============================================================
 CREATE TABLE registros_acceso (
     id SERIAL PRIMARY KEY,
@@ -391,7 +404,7 @@ CREATE TABLE registros_acceso (
 );
 
 -- ============================================================
--- 22. PAGOS PENDIENTES
+-- 25. PAGOS PENDIENTES
 -- ============================================================
 CREATE TABLE pagos_pendientes (
     id SERIAL PRIMARY KEY,
@@ -408,7 +421,7 @@ CREATE TABLE pagos_pendientes (
 );
 
 -- ============================================================
--- 23. OBJETIVOS MENSUALES
+-- 26. OBJETIVOS MENSUALES
 -- ============================================================
 CREATE TABLE objetivos_mensuales (
     id SERIAL PRIMARY KEY,
@@ -426,7 +439,7 @@ CREATE TABLE objetivos_mensuales (
 );
 
 -- ============================================================
--- 24. SUSCRIPCIÓN (flag de licencia para la app)
+-- 27. SUSCRIPCIÓN (flag de licencia)
 -- ============================================================
 CREATE TABLE suscripcion (
     id SERIAL PRIMARY KEY,
@@ -434,7 +447,7 @@ CREATE TABLE suscripcion (
 );
 
 -- ============================================================
--- 25. MOVIMIENTOS DE FECHAS DE INSCRIPCIÓN (auditoría)
+-- 28. MOVIMIENTOS DE FECHAS DE INSCRIPCIÓN (auditoría)
 -- ============================================================
 CREATE TABLE movimientos_fechas_inscripcion (
     id SERIAL PRIMARY KEY,
@@ -454,6 +467,23 @@ CREATE TABLE movimientos_fechas_inscripcion (
     FOREIGN KEY (servicio_id) REFERENCES servicios(id) ON DELETE RESTRICT,
     FOREIGN KEY (sucursal_id) REFERENCES sucursales(id) ON DELETE RESTRICT,
     FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE RESTRICT
+);
+
+-- ============================================================
+-- 29. COACH META MES (metas y adelantos por coach/mes)
+-- ============================================================
+CREATE TABLE coach_meta_mes (
+    id SERIAL PRIMARY KEY,
+    coach_id INTEGER NOT NULL,
+    mes VARCHAR(7) NOT NULL,
+    meta_inscritos INTEGER DEFAULT 0,
+    adelanto_monto DECIMAL(15, 2) DEFAULT 0,
+    fecha_creacion TIMESTAMP WITH TIME ZONE
+        DEFAULT TIMEZONE('America/La_Paz', NOW()),
+    fecha_actualizacion TIMESTAMP WITH TIME ZONE
+        DEFAULT TIMEZONE('America/La_Paz', NOW()),
+    FOREIGN KEY (coach_id) REFERENCES empleados(id) ON DELETE CASCADE,
+    UNIQUE (coach_id, mes)
 );
 
 -- ============================================================
@@ -514,6 +544,10 @@ CREATE INDEX idx_mov_fechas_insc_persona ON movimientos_fechas_inscripcion(perso
 CREATE INDEX idx_mov_fechas_insc_usuario ON movimientos_fechas_inscripcion(usuario_id);
 CREATE INDEX idx_mov_fechas_insc_fecha ON movimientos_fechas_inscripcion(fecha DESC);
 CREATE INDEX idx_cajas_estado ON cajas(estado);
+CREATE INDEX idx_det_venta_serv_coach ON detalle_venta_servicios(coach_id);
+CREATE INDEX idx_det_venta_serv_coach_insc ON detalle_venta_servicios(coach_id, inscripcion_id);
+CREATE INDEX idx_coach_meta_mes_coach ON coach_meta_mes(coach_id);
+CREATE INDEX idx_coach_meta_mes_mes ON coach_meta_mes(mes);
 
 -- ============================================================
 -- COMENTARIOS
@@ -543,19 +577,54 @@ COMMENT ON COLUMN horarios_empleado.sucursal_id IS 'Sucursal donde el empleado t
 COMMENT ON TABLE cupones IS 'Cupones de descuento para servicios y productos';
 COMMENT ON COLUMN cupones.empleado_id IS 'Empleado al que pertenece el cupón. NULL = cupón general.';
 COMMENT ON TABLE cupon_sucursal IS 'Sucursales donde aplica cada cupón';
-COMMENT ON COLUMN cajas.estado_caja IS 'abierta | cerrada';
-COMMENT ON COLUMN cajas.total IS 'Monto actual en la caja';
 COMMENT ON TABLE movimientos_caja IS 'Todos los movimientos de dinero por caja';
 COMMENT ON TABLE objetivos_mensuales IS 'Objetivos de ventas mensuales por sucursal';
 COMMENT ON COLUMN objetivos_mensuales.mes IS 'Mes en formato YYYY-MM (ej: 2024-03)';
 COMMENT ON COLUMN registros_acceso.inscripcion_id IS 'Inscripción específica a la que corresponde el acceso (para bloquear doble ingreso por día por inscripción).';
 COMMENT ON TABLE movimientos_fechas_inscripcion IS 'Auditoría de cambios de fechas (inicio/vencimiento) en inscripciones';
+COMMENT ON COLUMN detalle_venta_servicios.coach_id IS 'Empleado con rol=couch al que se atribuye esta inscripción vendida. NULL = sin atribución.';
+COMMENT ON TABLE coach_meta_mes IS 'Meta mensual de inscritos y adelanto por coach (mes en formato YYYY-MM).';
+
+-- ============================================================
+-- FUNCIÓN: validar coach_id en detalle_venta_servicios
+-- ============================================================
+CREATE OR REPLACE FUNCTION fn_validar_coach_en_detalle_venta()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  v_rol VARCHAR(20);
+BEGIN
+  IF NEW.coach_id IS NULL THEN
+    RETURN NEW;
+  END IF;
+
+  SELECT rol INTO v_rol FROM empleados WHERE id = NEW.coach_id;
+
+  IF v_rol IS NULL THEN
+    RAISE EXCEPTION 'El coach_id % no existe en empleados', NEW.coach_id;
+  END IF;
+
+  IF v_rol <> 'couch' THEN
+    RAISE EXCEPTION 'El empleado % tiene rol "%", se esperaba "couch"', NEW.coach_id, v_rol;
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_validar_coach_en_detalle_venta ON detalle_venta_servicios;
+
+CREATE TRIGGER trg_validar_coach_en_detalle_venta
+BEFORE INSERT OR UPDATE OF coach_id ON detalle_venta_servicios
+FOR EACH ROW
+EXECUTE FUNCTION fn_validar_coach_en_detalle_venta();
 
 -- ============================================================
 -- VISTA: ventas_mensuales_por_sucursal
 -- ============================================================
 CREATE OR REPLACE VIEW ventas_mensuales_por_sucursal AS
-SELECT 
+SELECT
     sucursal_id,
     TO_CHAR(fecha, 'YYYY-MM') AS mes,
     SUM(total) AS total_ventas,
@@ -571,7 +640,7 @@ FROM (
 ) AS todas_ventas
 GROUP BY sucursal_id, TO_CHAR(fecha, 'YYYY-MM');
 
-COMMENT ON VIEW ventas_mensuales_por_sucursal 
+COMMENT ON VIEW ventas_mensuales_por_sucursal
     IS 'Ventas agregadas por sucursal y mes (servicios + productos)';
 
 -- ============================================================
@@ -641,6 +710,10 @@ INSERT INTO empleados (persona_id, rol, sucursal_id, sueldo, comision, estado) V
 -- Cajas
 INSERT INTO cajas (nombre, estado_caja, total, sucursal_id) VALUES
 ('Caja Principal', 'cerrada', 0, 1);
+
+-- Asignación admin → caja (backfill incluido)
+INSERT INTO empleado_caja (empleado_id, caja_id, estado) VALUES
+(1, 1, 1);
 
 -- Usuario administrador
 INSERT INTO usuarios (username, password_hash, empleado_id, estado) VALUES

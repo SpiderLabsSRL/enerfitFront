@@ -5,11 +5,15 @@ import { getStoredUserData } from "./loginapi";
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
 export interface Service {
+  sucursalId: string;
+  inscripcionId: number;
   name: string;
   startDate: string;
   expirationDate: string;
   status: "active" | "inactive";
   ingresos_disponibles: number | null;
+  coachId: number | null;
+  coachNombre: string | null;
 }
 
 export interface Member {
@@ -34,7 +38,6 @@ export interface MembersResponse {
   success: boolean;
 }
 
-// ✅ Ya NO incluye birthDate
 export interface EditMemberRequest {
   nombres: string;
   apellidos: string;
@@ -45,6 +48,27 @@ export interface EditMemberRequest {
 export interface Branch {
   id: string;
   name: string;
+}
+
+export interface CoachOption {
+  id: number;
+  nombres: string;
+  apellidos: string;
+  ci: string;
+  telefono: string;
+  nombreCompleto: string;
+}
+
+// ============================================
+// Tipos backend (coaches)
+// ============================================
+interface BackendCoach {
+  id: number;
+  nombres: string;
+  apellidos: string;
+  ci: string;
+  telefono: string;
+  nombre_completo: string;
 }
 
 const filterActiveServices = (services: Service[]): Service[] => {
@@ -467,6 +491,104 @@ export const updateServiceDates = async (
         error.response.data?.message ||
         error.response.data?.error ||
         "Error al actualizar fechas";
+      throw new Error(errorMessage);
+    } else if (error.request) {
+      throw new Error("No se recibió respuesta del servidor");
+    } else {
+      throw new Error("Error de conexión con el servidor");
+    }
+  }
+};
+
+// ============================================
+// COACHES POR SUCURSAL
+// ============================================
+export const getCoachesBySucursal = async (
+  sucursalId: number,
+): Promise<CoachOption[]> => {
+  try {
+    const token = getToken();
+
+    const response = await axios.get<BackendCoach[]>(
+      `${API_URL}/inscription/coaches/sucursal/${sucursalId}`,
+      {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        timeout: 15000,
+      },
+    );
+
+    return response.data.map((c) => ({
+      id: c.id,
+      nombres: c.nombres,
+      apellidos: c.apellidos,
+      ci: c.ci,
+      telefono: c.telefono,
+      nombreCompleto: c.nombre_completo,
+    }));
+  } catch (error: any) {
+    console.error("Error en getCoachesBySucursal:", error);
+
+    if (error.response?.status === 401) {
+      sessionStorage.removeItem("token");
+      sessionStorage.removeItem("userData");
+      throw new Error("Sesión expirada. Por favor, inicie sesión nuevamente.");
+    }
+
+    if (error.response) {
+      const errorMessage =
+        error.response.data?.message ||
+        error.response.data?.error ||
+        "Error al obtener coaches";
+      throw new Error(errorMessage);
+    } else if (error.request) {
+      throw new Error("No se recibió respuesta del servidor");
+    } else {
+      throw new Error("Error de conexión con el servidor");
+    }
+  }
+};
+
+// ============================================
+// ACTUALIZAR COACH DE UNA INSCRIPCIÓN
+// ============================================
+export const updateServiceCoach = async (
+  memberId: string,
+  inscripcionId: number,
+  coachId: number | null,
+): Promise<{ message: string }> => {
+  try {
+    const token = getToken();
+
+    const response = await axios.put<{ message: string }>(
+      `${API_URL}/members/${memberId}/service-coach`,
+      { inscripcionId, coachId },
+      {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        timeout: 15000,
+      },
+    );
+
+    return response.data;
+  } catch (error: any) {
+    console.error("Error en updateServiceCoach:", error);
+
+    if (error.response?.status === 401) {
+      sessionStorage.removeItem("token");
+      sessionStorage.removeItem("userData");
+      throw new Error("Sesión expirada. Por favor, inicie sesión nuevamente.");
+    }
+
+    if (error.response) {
+      const errorMessage =
+        error.response.data?.message ||
+        error.response.data?.error ||
+        "Error al actualizar coach";
       throw new Error(errorMessage);
     } else if (error.request) {
       throw new Error("No se recibió respuesta del servidor");
