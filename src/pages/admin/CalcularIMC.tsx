@@ -17,9 +17,24 @@ import {
   Sparkles,
   Info,
   Target,
+  ArrowRight,
 } from "lucide-react";
 import { FaWhatsapp } from "react-icons/fa";
 import { cn } from "@/lib/utils";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+
+// ============================================
+// NÚMEROS DE WHATSAPP DISPONIBLES
+// ============================================
+const NUMEROS_WHATSAPP = [
+  { numero: "59171751585", etiqueta: "SAVAGE 1" },
+  { numero: "59170716562", etiqueta: "SAVAGE 2" },
+] as const;
 
 export function CalcularIMC() {
   const [pesoInput, setPesoInput] = useState<string>("70");
@@ -27,6 +42,7 @@ export function CalcularIMC() {
   const [imc, setImc] = useState<number | null>(null);
   const [categoria, setCategoria] = useState<string>("");
   const [imcCalculadoMobile, setImcCalculadoMobile] = useState(false);
+  const [showNumeroSelector, setShowNumeroSelector] = useState(false);
 
   const peso = pesoInput === "" ? 0 : Number(pesoInput);
   const altura = alturaInput === "" ? 0 : Number(alturaInput);
@@ -104,21 +120,28 @@ export function CalcularIMC() {
     ? categoriasIMC.find((cat) => imc >= cat.min && imc <= cat.max)
     : null;
 
-  // Abrir WhatsApp
-  const abrirWhatsApp = () => {
+  // ============================================
+  // CONSTRUIR MENSAJE Y ABRIR WHATSAPP
+  // ============================================
+  const construirMensaje = () => {
     let imcTexto = "aún no calculado";
     if (imc !== null) imcTexto = imc.toString();
 
-    const mensaje = encodeURIComponent(
+    return (
       `Hola, me gustaría recibir asesoría para un plan nutricional personalizado para mi proceso en el gimnasio SAVAGE FITNESS CLUB.\n\n` +
-        `Mis datos actuales son:\n` +
-        `• Peso: ${peso} kg\n` +
-        `• Altura: ${altura} cm\n` +
-        `• IMC: ${imcTexto}\n` +
-        `${categoria ? `• Categoría: ${categoria}\n` : ""}\n` +
-        `Quedo atento a su respuesta. ¡Gracias!`
+      `Mis datos actuales son:\n` +
+      `• Peso: ${peso} kg\n` +
+      `• Altura: ${altura} cm\n` +
+      `• IMC: ${imcTexto}\n` +
+      `${categoria ? `• Categoría: ${categoria}\n` : ""}\n` +
+      `Quedo atento a su respuesta. ¡Gracias!`
     );
-    window.open(`https://wa.me/+59176970088?text=${mensaje}`, "_blank");
+  };
+
+  const abrirWhatsApp = (numeroDestino: string) => {
+    const mensaje = encodeURIComponent(construirMensaje());
+    window.open(`https://wa.me/${numeroDestino}?text=${mensaje}`, "_blank");
+    setShowNumeroSelector(false);
   };
 
   // Calcular IMC
@@ -355,7 +378,7 @@ export function CalcularIMC() {
       </Button>
 
       <Button
-        onClick={abrirWhatsApp}
+        onClick={() => setShowNumeroSelector(true)}
         variant="outline"
         className="w-full border-primary/50 text-primary hover:bg-primary/10 hover:border-primary h-12 text-xs sm:text-sm rounded-lg gap-2 transition-all"
       >
@@ -495,6 +518,56 @@ export function CalcularIMC() {
           </Card>
         </div>
       </div>
+
+      {/* ============ MODAL SELECTOR DE NÚMERO ============ */}
+      <Dialog open={showNumeroSelector} onOpenChange={setShowNumeroSelector}>
+        <DialogContent className="bg-card border-border max-w-[92vw] sm:max-w-sm p-5 sm:p-6">
+          <div className="h-0.5 bg-gradient-to-r from-primary via-primary/80 to-primary -mt-5 -mx-5 mb-4 sm:-mt-6 sm:-mx-6 sm:mb-5" />
+          <DialogHeader className="space-y-0">
+            <DialogTitle className="flex items-center gap-2 text-lg sm:text-xl text-foreground">
+              <div className="p-2 rounded-lg bg-primary/10 border border-primary/20">
+                <FaWhatsapp className="h-4 w-4 text-primary" />
+              </div>
+              ¿A quién enviar?
+            </DialogTitle>
+          </DialogHeader>
+
+          <p className="text-sm text-muted-foreground mt-2">
+            Elige a cuál de nuestros números quieres enviar tu consulta:
+          </p>
+
+          <div className="space-y-3 mt-4">
+            {NUMEROS_WHATSAPP.map(({ numero, etiqueta }) => (
+              <button
+                key={numero}
+                onClick={() => abrirWhatsApp(numero)}
+                className="w-full flex items-center justify-between gap-3 p-3 bg-secondary/50 rounded-lg border border-border/50 hover:border-primary/50 hover:bg-primary/5 transition-all group"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center flex-shrink-0">
+                    <FaWhatsapp className="h-5 w-5 text-primary" />
+                  </div>
+                  <div className="text-left">
+                    <p className="font-semibold text-sm text-foreground">
+                      {etiqueta}
+                    </p>
+                    <p className="text-xs text-muted-foreground">+{numero}</p>
+                  </div>
+                </div>
+                <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all" />
+              </button>
+            ))}
+          </div>
+
+          <Button
+            variant="ghost"
+            onClick={() => setShowNumeroSelector(false)}
+            className="w-full mt-3 text-muted-foreground hover:text-foreground"
+          >
+            Cancelar
+          </Button>
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }

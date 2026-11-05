@@ -35,12 +35,21 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
+// ============================================
+// NÚMEROS DE WHATSAPP DISPONIBLES
+// ============================================
+const NUMEROS_WHATSAPP = [
+  { numero: "59171751585", etiqueta: "SAVAGE 1" },
+  { numero: "59170716562", etiqueta: "SAVAGE 2" },
+] as const;
+
 export function Tienda() {
   const { toast } = useToast();
   const [productos, setProductos] = useState<TiendaProducto[]>([]);
   const [loading, setLoading] = useState(true);
   const [carrito, setCarrito] = useState<TiendaProducto[]>([]);
   const [showCarrito, setShowCarrito] = useState(false);
+  const [showNumeroSelector, setShowNumeroSelector] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<TiendaProducto | null>(
     null
   );
@@ -235,9 +244,7 @@ export function Tienda() {
 
   const totalCarrito = carrito.reduce((sum, item) => sum + item.precio, 0);
 
-  const enviarPedidoWhatsApp = () => {
-    if (carrito.length === 0) return;
-
+  const construirMensaje = () => {
     let mensaje = "*PEDIDO SAVAGE STORE*\n\n";
     mensaje += "Hola! Me gustaria realizar el siguiente pedido:\n\n";
     mensaje += "*PRODUCTOS:*\n";
@@ -250,11 +257,17 @@ export function Tienda() {
 
     mensaje += `\n*TOTAL:* Bs. ${totalCarrito.toFixed(2)}\n\n`;
     mensaje += "Gracias!";
+    return mensaje;
+  };
 
-    const mensajeEncoded = encodeURIComponent(mensaje);
-    window.open(`https://wa.me/59167461937?text=${mensajeEncoded}`, "_blank");
+  const enviarPedidoWhatsApp = (numeroDestino: string) => {
+    if (carrito.length === 0) return;
+
+    const mensajeEncoded = encodeURIComponent(construirMensaje());
+    window.open(`https://wa.me/${numeroDestino}?text=${mensajeEncoded}`, "_blank");
 
     setCarrito([]);
+    setShowNumeroSelector(false);
     setShowCarrito(false);
   };
 
@@ -583,7 +596,7 @@ export function Tienda() {
                   </div>
 
                   <Button
-                    onClick={enviarPedidoWhatsApp}
+                    onClick={() => setShowNumeroSelector(true)}
                     className="w-full bg-primary hover:bg-primary/90 text-primary-foreground gap-2 h-12 text-base font-bold rounded-lg shadow-lg hover:shadow-primary/30 transition-all"
                   >
                     <FaWhatsapp className="h-5 w-5" />
@@ -593,6 +606,56 @@ export function Tienda() {
               </>
             )}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ============ MODAL SELECTOR DE NÚMERO ============ */}
+      <Dialog open={showNumeroSelector} onOpenChange={setShowNumeroSelector}>
+        <DialogContent className="bg-card border-border max-w-[92vw] sm:max-w-sm p-5 sm:p-6">
+          <div className="h-0.5 bg-gradient-to-r from-primary via-primary/80 to-primary -mt-5 -mx-5 mb-4 sm:-mt-6 sm:-mx-6 sm:mb-5" />
+          <DialogHeader className="space-y-0">
+            <DialogTitle className="flex items-center gap-2 text-lg sm:text-xl text-foreground">
+              <div className="p-2 rounded-lg bg-primary/10 border border-primary/20">
+                <FaWhatsapp className="h-4 w-4 text-primary" />
+              </div>
+              ¿A quién enviar?
+            </DialogTitle>
+          </DialogHeader>
+
+          <p className="text-sm text-muted-foreground mt-2">
+            Elige a cuál de nuestros números quieres enviar tu pedido:
+          </p>
+
+          <div className="space-y-3 mt-4">
+            {NUMEROS_WHATSAPP.map(({ numero, etiqueta }) => (
+              <button
+                key={numero}
+                onClick={() => enviarPedidoWhatsApp(numero)}
+                className="w-full flex items-center justify-between gap-3 p-3 bg-secondary/50 rounded-lg border border-border/50 hover:border-primary/50 hover:bg-primary/5 transition-all group"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center flex-shrink-0">
+                    <FaWhatsapp className="h-5 w-5 text-primary" />
+                  </div>
+                  <div className="text-left">
+                    <p className="font-semibold text-sm text-foreground">
+                      {etiqueta}
+                    </p>
+                    <p className="text-xs text-muted-foreground">+{numero}</p>
+                  </div>
+                </div>
+                <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all" />
+              </button>
+            ))}
+          </div>
+
+          <Button
+            variant="ghost"
+            onClick={() => setShowNumeroSelector(false)}
+            className="w-full mt-3 text-muted-foreground hover:text-foreground"
+          >
+            Cancelar
+          </Button>
         </DialogContent>
       </Dialog>
 

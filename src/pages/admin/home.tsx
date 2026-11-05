@@ -251,7 +251,7 @@ export function Home() {
             <div>
               <h4 className="font-bold text-lg mb-6 flex items-center gap-2">
                 <Phone className="h-5 w-5" />
-                Contacto
+                CONTACTANOS
               </h4>
               <div className="space-y-4 text-muted-foreground">
                 <div className="flex gap-3">
@@ -265,7 +265,8 @@ export function Home() {
                 </div>
                 <div className="flex items-center gap-3">
                   <Phone className="h-5 w-5 text-primary" />
-                  <span className="font-medium">76970088</span>
+                  <span className="font-medium">71751585</span> -
+                  <span className="font-medium">70716562</span>
                 </div>
               </div>
             </div>
