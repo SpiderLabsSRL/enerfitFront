@@ -9,7 +9,7 @@ import imagen4 from "../../assets/img-bunker/imagen4.jpg";
 
 export function PorQueElegirnos() {
   const gymInfo = {
-    name: "ENERFIT NUTRITION",
+    name: "SAVAGE FITNESS CLUB",
     address:
       "Av. Simón López 275, Salon de Eventos 'La Riviera frente a la Corte Electoral, Cochabamba, Bolivia",
     mapLink: "https://maps.app.goo.gl/c9acAmABW2piLXSk6",

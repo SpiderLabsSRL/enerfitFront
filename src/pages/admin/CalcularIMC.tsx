@@ -110,7 +110,7 @@ export function CalcularIMC() {
     if (imc !== null) imcTexto = imc.toString();
 
     const mensaje = encodeURIComponent(
-      `Hola, me gustaría recibir asesoría para un plan nutricional personalizado para mi proceso en el gimnasio ENERFIT.\n\n` +
+      `Hola, me gustaría recibir asesoría para un plan nutricional personalizado para mi proceso en el gimnasio SAVAGE FITNESS CLUB.\n\n` +
         `Mis datos actuales son:\n` +
         `• Peso: ${peso} kg\n` +
         `• Altura: ${altura} cm\n` +

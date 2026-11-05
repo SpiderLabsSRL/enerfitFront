@@ -57,7 +57,7 @@ export function Home() {
               <div>
                 <img
                   src={mutantLogo}
-                  alt="ENERFIT"
+                  alt="SAVAGE FITNESS CLUB"
                   className="h-16 mx-auto object-contain"
                 />
               </div>
@@ -198,7 +198,7 @@ export function Home() {
                 <div>
                   <img
                     src={mutantLogo}
-                    alt="ENERFIT"
+                    alt="SAVAGE FITNESS CLUB"
                     className="h-18 mx-auto"
                   />
                 </div>
@@ -257,7 +257,7 @@ export function Home() {
                 <div className="flex gap-3">
                   <MapPin className="h-5 w-5 text-primary flex-shrink-0 mt-1" />
                   <div>
-                    <p className="font-medium text-foreground mb-1">ENERFIT NUTRITION</p>
+                    <p className="font-medium text-foreground mb-1">SAVAGE FITNESS CLUB</p>
                     <p className="text-sm">
                       Av. Simón López 275, Salon de Eventos 'La Riviera frente a la Corte Electoral, Cochabamba, Bolivia
                     </p>
@@ -315,7 +315,7 @@ export function Home() {
           <div className="border-t border-border mt-12 pt-8">
             <div className="flex flex-col md:flex-row justify-between items-center gap-4">
               <p className="text-muted-foreground text-sm text-center md:text-left">
-                © {new Date().getFullYear()} ENERFIT. Todos los derechos reservados.
+                © {new Date().getFullYear()} SAVAGE FITNESS CLUB. Todos los derechos reservados.
               </p>
               <div className="flex gap-6 text-sm text-muted-foreground">
                 <a href="#" className="hover:text-foreground transition-colors">

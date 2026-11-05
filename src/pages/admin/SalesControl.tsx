@@ -75,6 +75,31 @@ import {
 import { useToast } from "@/hooks/use-toast";
 
 // ============================================
+// HOOK: detectar móvil
+// ============================================
+function useIsMobile(breakpoint = 768) {
+  const [isMobile, setIsMobile] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return window.matchMedia(`(max-width: ${breakpoint - 1}px)`).matches;
+  });
+
+  useEffect(() => {
+    const mq = window.matchMedia(`(max-width: ${breakpoint - 1}px)`);
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    // Compatibilidad con navegadores viejos
+    if (mq.addEventListener) mq.addEventListener("change", handler);
+    else mq.addListener(handler);
+    setIsMobile(mq.matches);
+    return () => {
+      if (mq.removeEventListener) mq.removeEventListener("change", handler);
+      else mq.removeListener(handler);
+    };
+  }, [breakpoint]);
+
+  return isMobile;
+}
+
+// ============================================
 // TIPOS
 // ============================================
 interface SaleItem {
@@ -112,7 +137,6 @@ type DateFilterType =
 
 // ============================================
 // HELPER: ¿La venta es de hoy?
-// fecha viene como "DD/MM/YYYY, HH24:MI:SS"
 // ============================================
 function isSaleFromToday(fechaStr: string): boolean {
   try {
@@ -128,6 +152,22 @@ function isSaleFromToday(fechaStr: string): boolean {
   } catch {
     return false;
   }
+}
+
+// ============================================
+// HELPER: parsear items (por si vienen como string JSON)
+// ============================================
+function parseItems(items: SaleItem[] | any): SaleItem[] {
+  if (Array.isArray(items)) return items;
+  if (typeof items === "string") {
+    try {
+      const parsed = JSON.parse(items);
+      if (Array.isArray(parsed)) return parsed;
+    } catch {
+      return [];
+    }
+  }
+  return [];
 }
 
 // ============================================
@@ -422,11 +462,202 @@ function ResumenDetalladoModal({
 }
 
 // ============================================
+// FORMAT HELPERS (fuera del componente para reutilizar)
+// ============================================
+function PaymentMethodBadge({ sale }: { sale: SaleRecord }) {
+  switch (sale.formaPago) {
+    case "efectivo":
+      return <Badge className="bg-green-100 text-green-800">Efectivo</Badge>;
+    case "qr":
+      return (
+        <Badge variant="outline" className="bg-blue-100 text-blue-800">
+          QR
+        </Badge>
+      );
+    case "mixto":
+      return <Badge className="bg-purple-100 text-purple-800">Mixto</Badge>;
+    default:
+      return null;
+  }
+}
+
+function PaymentDetails({ sale }: { sale: SaleRecord }) {
+  if (sale.formaPago === "mixto") {
+    return (
+      <div className="text-xs space-y-0.5">
+        <div className="text-green-600">
+          Efectivo: Bs. {(sale.efectivo || 0).toFixed(2)}
+        </div>
+        <div className="text-blue-600">
+          QR: Bs. {(sale.qr || 0).toFixed(2)}
+        </div>
+      </div>
+    );
+  }
+  return <div className="text-xs font-medium">Bs. {sale.total.toFixed(2)}</div>;
+}
+
+function FormatCliente({ cliente }: { cliente: string | undefined }) {
+  if (!cliente || cliente.trim() === "") {
+    return <span className="text-muted-foreground text-xs">—</span>;
+  }
+  const clientes = cliente
+    .split(",")
+    .map((c) => c.trim())
+    .filter((c) => c.length > 0);
+
+  if (clientes.length === 1) {
+    return <span className="text-xs md:text-sm">{clientes[0]}</span>;
+  }
+  return (
+    <div className="flex flex-col gap-0.5">
+      {clientes.map((c, idx) => (
+        <div key={idx} className="text-xs md:text-sm flex items-start gap-1">
+          <span className="text-muted-foreground">-</span>
+          <span>{c}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ============================================
+// ✅ NUEVO: CARD DE VENTA PARA MÓVIL
+// ============================================
+function SaleCard({
+  sale,
+  showCliente,
+  onView,
+  onAnular,
+  esAdmin,
+}: {
+  sale: SaleRecord;
+  showCliente: boolean;
+  onView: () => void;
+  onAnular: () => void;
+  esAdmin: boolean;
+}) {
+  const items = parseItems(sale.items || []);
+  const esHoy = isSaleFromToday(sale.fecha);
+
+  return (
+    <Card className="overflow-hidden">
+      <CardContent className="p-3 space-y-2.5">
+        {/* Header: fecha + badge tipo */}
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0 flex-1">
+            <p className="font-mono text-[10px] text-muted-foreground">
+              {sale.fecha}
+            </p>
+            <p className="text-xs text-muted-foreground truncate">
+              {sale.sucursal} • {sale.empleado}
+            </p>
+          </div>
+          <PaymentMethodBadge sale={sale} />
+        </div>
+
+        {/* Cliente (solo servicios) */}
+        {showCliente && (
+          <div className="text-xs">
+            <span className="text-muted-foreground">Cliente: </span>
+            <FormatCliente cliente={sale.cliente} />
+          </div>
+        )}
+
+        {/* Items */}
+        <div className="bg-muted/40 rounded-md p-2 space-y-1">
+          {items.length === 0 ? (
+            <p className="text-xs text-muted-foreground">—</p>
+          ) : (
+            items.map((item, i) => (
+              <div
+                key={i}
+                className="flex justify-between text-xs gap-2"
+              >
+                <span className="break-words">
+                  {item.nombre}{" "}
+                  <span className="text-muted-foreground">
+                    x{item.cantidad}
+                  </span>
+                </span>
+                <span className="font-medium flex-shrink-0">
+                  Bs. {(item.subtotal || 0).toFixed(2)}
+                </span>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Totales */}
+        <div className="space-y-1 text-xs">
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Subtotal</span>
+            <span>Bs. {sale.subtotal.toFixed(2)}</span>
+          </div>
+          {sale.descuento > 0 && (
+            <div className="flex justify-between text-destructive">
+              <span>Descuento</span>
+              <span>-Bs. {sale.descuento.toFixed(2)}</span>
+            </div>
+          )}
+          <div className="flex justify-between font-bold text-sm border-t pt-1">
+            <span>Total</span>
+            <span className="text-primary">Bs. {sale.total.toFixed(2)}</span>
+          </div>
+          <div className="pt-1">
+            <PaymentDetails sale={sale} />
+          </div>
+        </div>
+
+        {/* Acciones */}
+        <div className="flex gap-2 pt-1">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onView}
+            className="flex-1 h-8 text-xs gap-1"
+          >
+            <Eye className="h-3.5 w-3.5" />
+            Ver detalle
+          </Button>
+          {esAdmin && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onAnular}
+              disabled={!esHoy}
+              title={
+                !esHoy
+                  ? "Solo se pueden anular ventas de hoy"
+                  : "Anular venta"
+              }
+              className={cn(
+                "h-8 text-xs gap-1",
+                esHoy
+                  ? "text-destructive border-destructive/30 hover:bg-destructive/10"
+                  : "opacity-40"
+              )}
+            >
+              {esHoy ? (
+                <Trash2 className="h-3.5 w-3.5" />
+              ) : (
+                <Lock className="h-3.5 w-3.5" />
+              )}
+            </Button>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ============================================
 // COMPONENTE PRINCIPAL
 // ============================================
 export function SalesControl() {
   const { user } = useUser();
   const { toast } = useToast();
+  const isMobile = useIsMobile();
 
   const [salesData, setSalesData] = useState<{
     sales: SaleRecord[];
@@ -468,7 +699,6 @@ export function SalesControl() {
   const [specificDateOpen, setSpecificDateOpen] = useState(false);
   const [showFilters, setShowFilters] = useState(true);
 
-  // ✅ Estado para anular
   const [saleToAnular, setSaleToAnular] = useState<SaleRecord | null>(null);
   const [isAnularModalOpen, setIsAnularModalOpen] = useState(false);
   const [isAnulando, setIsAnulando] = useState(false);
@@ -637,9 +867,6 @@ export function SalesControl() {
     setIsDetailModalOpen(true);
   };
 
-  // ============================================
-  // ✅ ABRIR MODAL DE ANULAR
-  // ============================================
   const handleOpenAnular = (sale: SaleRecord) => {
     if (!esAdmin) {
       toast({
@@ -663,9 +890,6 @@ export function SalesControl() {
     setIsAnularModalOpen(true);
   };
 
-  // ============================================
-  // ✅ CONFIRMAR ANULACIÓN
-  // ============================================
   const handleConfirmAnular = async () => {
     if (!saleToAnular) return;
 
@@ -683,7 +907,6 @@ export function SalesControl() {
       setIsDetailModalOpen(false);
       setSelectedSale(null);
 
-      // Recargar datos para reflejar cambios
       await cargarDatos();
     } catch (error: any) {
       toast({
@@ -908,62 +1131,13 @@ export function SalesControl() {
   );
 
   // ============================================
-  // FORMATO
+  // FORMATO (para tabla desktop)
   // ============================================
-  const formatPaymentMethod = (sale: SaleRecord) => {
-    switch (sale.formaPago) {
-      case "efectivo":
-        return <Badge className="bg-green-100 text-green-800">Efectivo</Badge>;
-      case "qr":
-        return (
-          <Badge variant="outline" className="bg-blue-100 text-blue-800">
-            QR
-          </Badge>
-        );
-      case "mixto":
-        return (
-          <Badge className="bg-purple-100 text-purple-800">Mixto</Badge>
-        );
-      default:
-        return null;
-    }
-  };
-
-  const formatPaymentDetails = (sale: SaleRecord) => {
-    if (sale.formaPago === "mixto") {
-      return (
-        <div className="text-xs space-y-0.5">
-          <div className="text-green-600">
-            Efectivo: Bs. {(sale.efectivo || 0).toFixed(2)}
-          </div>
-          <div className="text-blue-600">
-            QR: Bs. {(sale.qr || 0).toFixed(2)}
-          </div>
-        </div>
-      );
-    }
-    return (
-      <div className="text-xs font-medium">Bs. {sale.total.toFixed(2)}</div>
-    );
-  };
-
   const formatDetail = (items: SaleItem[] | any) => {
-    let arr: SaleItem[] = [];
-    if (Array.isArray(items)) {
-      arr = items;
-    } else if (typeof items === "string") {
-      try {
-        const parsed = JSON.parse(items);
-        if (Array.isArray(parsed)) arr = parsed;
-      } catch {
-        arr = [];
-      }
-    }
-
+    const arr = parseItems(items);
     if (arr.length === 0) {
       return <span className="text-muted-foreground text-xs">—</span>;
     }
-
     return arr.map((item, index) => (
       <div key={index} className="text-xs py-0.5">
         • {item.nombre} x{item.cantidad}
@@ -971,34 +1145,8 @@ export function SalesControl() {
     ));
   };
 
-  const formatCliente = (cliente: string | undefined) => {
-    if (!cliente || cliente.trim() === "") {
-      return <span className="text-muted-foreground text-xs">—</span>;
-    }
-
-    const clientes = cliente
-      .split(",")
-      .map((c) => c.trim())
-      .filter((c) => c.length > 0);
-
-    if (clientes.length === 1) {
-      return <span className="text-xs md:text-sm">{clientes[0]}</span>;
-    }
-
-    return (
-      <div className="flex flex-col gap-0.5">
-        {clientes.map((c, idx) => (
-          <div key={idx} className="text-xs md:text-sm flex items-start gap-1">
-            <span className="text-muted-foreground">-</span>
-            <span>{c}</span>
-          </div>
-        ))}
-      </div>
-    );
-  };
-
   // ============================================
-  // BOTÓN DE ANULAR (solo admin + venta de hoy)
+  // BOTÓN DE ANULAR (para tabla desktop)
   // ============================================
   const renderAnularButton = (sale: SaleRecord) => {
     if (!esAdmin) return null;
@@ -1418,201 +1566,251 @@ export function SalesControl() {
             ) : (
               <>
                 <TabsContent value="productos" className="mt-0">
-                  <div className="rounded-md border overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow className="bg-muted/50">
-                          <TableHead className="min-w-[80px] text-xs">
-                            Fecha
-                          </TableHead>
-                          <TableHead className="min-w-[90px] text-xs">
-                            Sucursal
-                          </TableHead>
-                          <TableHead className="min-w-[90px] text-xs">
-                            Empleado
-                          </TableHead>
-                          <TableHead className="min-w-[180px] text-xs">
-                            Productos
-                          </TableHead>
-                          <TableHead className="min-w-[70px] text-xs">
-                            Subtotal
-                          </TableHead>
-                          <TableHead className="min-w-[70px] text-xs">
-                            Dto.
-                          </TableHead>
-                          <TableHead className="min-w-[70px] text-xs">
-                            Total
-                          </TableHead>
-                          <TableHead className="min-w-[80px] text-xs">
-                            Pago
-                          </TableHead>
-                          <TableHead className="min-w-[90px] text-xs">
-                            Detalle
-                          </TableHead>
-                          <TableHead className="w-[80px]"></TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {productSales.length === 0 ? (
-                          <TableRow>
-                            <TableCell
-                              colSpan={10}
-                              className="text-center py-8 text-muted-foreground"
-                            >
-                              No hay ventas de productos
-                            </TableCell>
+                  {isMobile ? (
+                    /* ✅ MÓVIL: cards apiladas */
+                    <div className="space-y-3">
+                      {productSales.length === 0 ? (
+                        <div className="text-center py-8 text-muted-foreground text-sm">
+                          No hay ventas de productos
+                        </div>
+                      ) : (
+                        productSales.map((sale) => (
+                          <SaleCard
+                            key={sale.id}
+                            sale={sale}
+                            showCliente={false}
+                            onView={() => handleViewDetails(sale)}
+                            onAnular={() => handleOpenAnular(sale)}
+                            esAdmin={esAdmin}
+                          />
+                        ))
+                      )}
+                    </div>
+                  ) : (
+                    /* DESKTOP: tabla */
+                    <div className="rounded-md border overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-muted/50">
+                            <TableHead className="min-w-[80px] text-xs">
+                              Fecha
+                            </TableHead>
+                            <TableHead className="min-w-[90px] text-xs">
+                              Sucursal
+                            </TableHead>
+                            <TableHead className="min-w-[90px] text-xs">
+                              Empleado
+                            </TableHead>
+                            <TableHead className="min-w-[180px] text-xs">
+                              Productos
+                            </TableHead>
+                            <TableHead className="min-w-[70px] text-xs">
+                              Subtotal
+                            </TableHead>
+                            <TableHead className="min-w-[70px] text-xs">
+                              Dto.
+                            </TableHead>
+                            <TableHead className="min-w-[70px] text-xs">
+                              Total
+                            </TableHead>
+                            <TableHead className="min-w-[80px] text-xs">
+                              Pago
+                            </TableHead>
+                            <TableHead className="min-w-[90px] text-xs">
+                              Detalle
+                            </TableHead>
+                            <TableHead className="w-[80px]"></TableHead>
                           </TableRow>
-                        ) : (
-                          productSales.map((sale) => (
-                            <TableRow key={sale.id}>
-                              <TableCell className="font-mono text-[10px] md:text-xs">
-                                {sale.fecha}
-                              </TableCell>
-                              <TableCell className="text-xs md:text-sm">
-                                {sale.sucursal}
-                              </TableCell>
-                              <TableCell className="text-xs md:text-sm">
-                                {sale.empleado}
-                              </TableCell>
-                              <TableCell className="max-w-[180px]">
-                                {formatDetail(sale.items || [])}
-                              </TableCell>
-                              <TableCell className="text-xs md:text-sm">
-                                Bs. {sale.subtotal.toFixed(2)}
-                              </TableCell>
-                              <TableCell className="text-destructive text-xs md:text-sm">
-                                {sale.descuento > 0
-                                  ? `-Bs. ${sale.descuento.toFixed(2)}`
-                                  : "-"}
-                              </TableCell>
-                              <TableCell className="font-bold text-xs md:text-sm">
-                                Bs. {sale.total.toFixed(2)}
-                              </TableCell>
-                              <TableCell>{formatPaymentMethod(sale)}</TableCell>
-                              <TableCell>
-                                {formatPaymentDetails(sale)}
-                              </TableCell>
-                              <TableCell>
-                                <div className="flex items-center gap-1">
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => handleViewDetails(sale)}
-                                    className="h-7 w-7 md:h-8 md:w-8"
-                                  >
-                                    <Eye className="h-3 w-3 md:h-4 md:w-4" />
-                                  </Button>
-                                  {renderAnularButton(sale)}
-                                </div>
+                        </TableHeader>
+                        <TableBody>
+                          {productSales.length === 0 ? (
+                            <TableRow>
+                              <TableCell
+                                colSpan={10}
+                                className="text-center py-8 text-muted-foreground"
+                              >
+                                No hay ventas de productos
                               </TableCell>
                             </TableRow>
-                          ))
-                        )}
-                      </TableBody>
-                    </Table>
-                  </div>
+                          ) : (
+                            productSales.map((sale) => (
+                              <TableRow key={sale.id}>
+                                <TableCell className="font-mono text-[10px] md:text-xs">
+                                  {sale.fecha}
+                                </TableCell>
+                                <TableCell className="text-xs md:text-sm">
+                                  {sale.sucursal}
+                                </TableCell>
+                                <TableCell className="text-xs md:text-sm">
+                                  {sale.empleado}
+                                </TableCell>
+                                <TableCell className="max-w-[180px]">
+                                  {formatDetail(sale.items || [])}
+                                </TableCell>
+                                <TableCell className="text-xs md:text-sm">
+                                  Bs. {sale.subtotal.toFixed(2)}
+                                </TableCell>
+                                <TableCell className="text-destructive text-xs md:text-sm">
+                                  {sale.descuento > 0
+                                    ? `-Bs. ${sale.descuento.toFixed(2)}`
+                                    : "-"}
+                                </TableCell>
+                                <TableCell className="font-bold text-xs md:text-sm">
+                                  Bs. {sale.total.toFixed(2)}
+                                </TableCell>
+                                <TableCell>
+                                  <PaymentMethodBadge sale={sale} />
+                                </TableCell>
+                                <TableCell>
+                                  <PaymentDetails sale={sale} />
+                                </TableCell>
+                                <TableCell>
+                                  <div className="flex items-center gap-1">
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => handleViewDetails(sale)}
+                                      className="h-7 w-7 md:h-8 md:w-8"
+                                    >
+                                      <Eye className="h-3 w-3 md:h-4 md:w-4" />
+                                    </Button>
+                                    {renderAnularButton(sale)}
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            ))
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
                 </TabsContent>
 
                 <TabsContent value="servicios" className="mt-0">
-                  <div className="rounded-md border overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow className="bg-muted/50">
-                          <TableHead className="min-w-[80px] text-xs">
-                            Fecha
-                          </TableHead>
-                          <TableHead className="min-w-[90px] text-xs">
-                            Sucursal
-                          </TableHead>
-                          <TableHead className="min-w-[90px] text-xs">
-                            Cliente
-                          </TableHead>
-                          <TableHead className="min-w-[90px] text-xs">
-                            Empleado
-                          </TableHead>
-                          <TableHead className="min-w-[180px] text-xs">
-                            Servicios
-                          </TableHead>
-                          <TableHead className="min-w-[70px] text-xs">
-                            Subtotal
-                          </TableHead>
-                          <TableHead className="min-w-[70px] text-xs">
-                            Dto.
-                          </TableHead>
-                          <TableHead className="min-w-[70px] text-xs">
-                            Total
-                          </TableHead>
-                          <TableHead className="min-w-[80px] text-xs">
-                            Pago
-                          </TableHead>
-                          <TableHead className="min-w-[90px] text-xs">
-                            Detalle
-                          </TableHead>
-                          <TableHead className="w-[80px]"></TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {serviceSales.length === 0 ? (
-                          <TableRow>
-                            <TableCell
-                              colSpan={11}
-                              className="text-center py-8 text-muted-foreground"
-                            >
-                              No hay ventas de servicios
-                            </TableCell>
+                  {isMobile ? (
+                    /* ✅ MÓVIL: cards apiladas */
+                    <div className="space-y-3">
+                      {serviceSales.length === 0 ? (
+                        <div className="text-center py-8 text-muted-foreground text-sm">
+                          No hay ventas de servicios
+                        </div>
+                      ) : (
+                        serviceSales.map((sale) => (
+                          <SaleCard
+                            key={sale.id}
+                            sale={sale}
+                            showCliente={true}
+                            onView={() => handleViewDetails(sale)}
+                            onAnular={() => handleOpenAnular(sale)}
+                            esAdmin={esAdmin}
+                          />
+                        ))
+                      )}
+                    </div>
+                  ) : (
+                    /* DESKTOP: tabla */
+                    <div className="rounded-md border overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-muted/50">
+                            <TableHead className="min-w-[80px] text-xs">
+                              Fecha
+                            </TableHead>
+                            <TableHead className="min-w-[90px] text-xs">
+                              Sucursal
+                            </TableHead>
+                            <TableHead className="min-w-[90px] text-xs">
+                              Cliente
+                            </TableHead>
+                            <TableHead className="min-w-[90px] text-xs">
+                              Empleado
+                            </TableHead>
+                            <TableHead className="min-w-[180px] text-xs">
+                              Servicios
+                            </TableHead>
+                            <TableHead className="min-w-[70px] text-xs">
+                              Subtotal
+                            </TableHead>
+                            <TableHead className="min-w-[70px] text-xs">
+                              Dto.
+                            </TableHead>
+                            <TableHead className="min-w-[70px] text-xs">
+                              Total
+                            </TableHead>
+                            <TableHead className="min-w-[80px] text-xs">
+                              Pago
+                            </TableHead>
+                            <TableHead className="min-w-[90px] text-xs">
+                              Detalle
+                            </TableHead>
+                            <TableHead className="w-[80px]"></TableHead>
                           </TableRow>
-                        ) : (
-                          serviceSales.map((sale) => (
-                            <TableRow key={sale.id}>
-                              <TableCell className="font-mono text-[10px] md:text-xs">
-                                {sale.fecha}
-                              </TableCell>
-                              <TableCell className="text-xs md:text-sm">
-                                {sale.sucursal}
-                              </TableCell>
-                              <TableCell className="align-top">
-                                {formatCliente(sale.cliente)}
-                              </TableCell>
-                              <TableCell className="text-xs md:text-sm">
-                                {sale.empleado}
-                              </TableCell>
-                              <TableCell className="max-w-[180px]">
-                                {formatDetail(sale.items || [])}
-                              </TableCell>
-                              <TableCell className="text-xs md:text-sm">
-                                Bs. {sale.subtotal.toFixed(2)}
-                              </TableCell>
-                              <TableCell className="text-destructive text-xs md:text-sm">
-                                {sale.descuento > 0
-                                  ? `-Bs. ${sale.descuento.toFixed(2)}`
-                                  : "-"}
-                              </TableCell>
-                              <TableCell className="font-bold text-xs md:text-sm">
-                                Bs. {sale.total.toFixed(2)}
-                              </TableCell>
-                              <TableCell>{formatPaymentMethod(sale)}</TableCell>
-                              <TableCell>
-                                {formatPaymentDetails(sale)}
-                              </TableCell>
-                              <TableCell>
-                                <div className="flex items-center gap-1">
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => handleViewDetails(sale)}
-                                    className="h-7 w-7 md:h-8 md:w-8"
-                                  >
-                                    <Eye className="h-3 w-3 md:h-4 md:w-4" />
-                                  </Button>
-                                  {renderAnularButton(sale)}
-                                </div>
+                        </TableHeader>
+                        <TableBody>
+                          {serviceSales.length === 0 ? (
+                            <TableRow>
+                              <TableCell
+                                colSpan={11}
+                                className="text-center py-8 text-muted-foreground"
+                              >
+                                No hay ventas de servicios
                               </TableCell>
                             </TableRow>
-                          ))
-                        )}
-                      </TableBody>
-                    </Table>
-                  </div>
+                          ) : (
+                            serviceSales.map((sale) => (
+                              <TableRow key={sale.id}>
+                                <TableCell className="font-mono text-[10px] md:text-xs">
+                                  {sale.fecha}
+                                </TableCell>
+                                <TableCell className="text-xs md:text-sm">
+                                  {sale.sucursal}
+                                </TableCell>
+                                <TableCell className="align-top">
+                                  <FormatCliente cliente={sale.cliente} />
+                                </TableCell>
+                                <TableCell className="text-xs md:text-sm">
+                                  {sale.empleado}
+                                </TableCell>
+                                <TableCell className="max-w-[180px]">
+                                  {formatDetail(sale.items || [])}
+                                </TableCell>
+                                <TableCell className="text-xs md:text-sm">
+                                  Bs. {sale.subtotal.toFixed(2)}
+                                </TableCell>
+                                <TableCell className="text-destructive text-xs md:text-sm">
+                                  {sale.descuento > 0
+                                    ? `-Bs. ${sale.descuento.toFixed(2)}`
+                                    : "-"}
+                                </TableCell>
+                                <TableCell className="font-bold text-xs md:text-sm">
+                                  Bs. {sale.total.toFixed(2)}
+                                </TableCell>
+                                <TableCell>
+                                  <PaymentMethodBadge sale={sale} />
+                                </TableCell>
+                                <TableCell>
+                                  <PaymentDetails sale={sale} />
+                                </TableCell>
+                                <TableCell>
+                                  <div className="flex items-center gap-1">
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => handleViewDetails(sale)}
+                                      className="h-7 w-7 md:h-8 md:w-8"
+                                    >
+                                      <Eye className="h-3 w-3 md:h-4 md:w-4" />
+                                    </Button>
+                                    {renderAnularButton(sale)}
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            ))
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
                 </TabsContent>
               </>
             )}
@@ -1702,7 +1900,7 @@ export function SalesControl() {
                         Cliente(s):
                       </span>
                       <div className="mt-1">
-                        {formatCliente(selectedSale.cliente)}
+                        <FormatCliente cliente={selectedSale.cliente} />
                       </div>
                     </div>
                   )}
@@ -1724,7 +1922,7 @@ export function SalesControl() {
                   </p>
                   <p>
                     <span className="text-muted-foreground">Forma pago:</span>{" "}
-                    {formatPaymentMethod(selectedSale)}
+                    <PaymentMethodBadge sale={selectedSale} />
                   </p>
                 </div>
               </div>
@@ -1758,7 +1956,6 @@ export function SalesControl() {
                 </div>
               )}
 
-              {/* Botón anular dentro del modal (solo admin + hoy) */}
               {esAdmin && isSaleFromToday(selectedSale.fecha) && (
                 <div className="pt-2 border-t">
                   <Button
@@ -1780,7 +1977,7 @@ export function SalesControl() {
         </DialogContent>
       </Dialog>
 
-      {/* ✅ Modal de confirmación de anulación */}
+      {/* Modal de confirmación de anulación */}
       <Dialog open={isAnularModalOpen} onOpenChange={setIsAnularModalOpen}>
         <DialogContent className="max-w-[95vw] md:max-w-md p-4 md:p-6">
           <DialogHeader>
@@ -1817,7 +2014,9 @@ export function SalesControl() {
               </div>
 
               <div className="p-3 bg-amber-50 dark:bg-amber-950/30 rounded-lg text-xs md:text-sm text-amber-900 dark:text-amber-200">
-                <p className="font-medium mb-1">Se realizarán los siguientes cambios:</p>
+                <p className="font-medium mb-1">
+                  Se realizarán los siguientes cambios:
+                </p>
                 <ul className="list-disc list-inside space-y-0.5">
                   {saleToAnular.tipo === "producto" ? (
                     <>

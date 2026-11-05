@@ -39,7 +39,6 @@ import {
   FileText,
   Tag,
   MapPin,
-  Clock,
   Hash,
   Sparkles,
   Package,
@@ -51,7 +50,6 @@ import {
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import {
   getCupones,
@@ -66,6 +64,30 @@ import {
   type Empleado,
   type CuponFormData,
 } from "../../api/CuponesApi";
+
+// ============================================
+// HOOK: detectar móvil
+// ============================================
+function useIsMobile(breakpoint = 768) {
+  const [isMobile, setIsMobile] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return window.matchMedia(`(max-width: ${breakpoint - 1}px)`).matches;
+  });
+
+  useEffect(() => {
+    const mq = window.matchMedia(`(max-width: ${breakpoint - 1}px)`);
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    if (mq.addEventListener) mq.addEventListener("change", handler);
+    else mq.addListener(handler);
+    setIsMobile(mq.matches);
+    return () => {
+      if (mq.removeEventListener) mq.removeEventListener("change", handler);
+      else mq.removeListener(handler);
+    };
+  }, [breakpoint]);
+
+  return isMobile;
+}
 
 const getBoliviaDate = (): string => {
   const now = new Date();
@@ -90,14 +112,167 @@ const generarCodigo = (): string => {
   return codigo;
 };
 
-// ✅ Tipo local que permite "" como "sin selección"
 type TipoDescuentoLocal = "porcentaje" | "monto_fijo" | "";
 
 interface CuponFormDataLocal extends Omit<CuponFormData, "tipo"> {
   tipo: TipoDescuentoLocal;
 }
 
+// ============================================
+// CARD DE CUPÓN (MÓVIL)
+// ============================================
+function CuponCard({
+  cupon,
+  onEdit,
+  onDelete,
+  onToggle,
+  onCopy,
+  copiado,
+  isButtonLoading,
+  getSucursalesNombres,
+}: {
+  cupon: Cupon;
+  onEdit: (c: Cupon) => void;
+  onDelete: (id: string) => void;
+  onToggle: (id: string) => void;
+  onCopy: (codigo: string) => void;
+  copiado: string | null;
+  isButtonLoading: (id: string) => boolean;
+  getSucursalesNombres: (ids: string[]) => string;
+}) {
+  return (
+    <Card className="overflow-hidden">
+      <CardContent className="p-3 space-y-2.5">
+        {/* Código + Estado */}
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-center gap-1.5 min-w-0 flex-1">
+            <code className="px-2 py-1 bg-muted rounded font-mono text-xs truncate">
+              {cupon.codigo}
+            </code>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onCopy(cupon.codigo)}
+              className="h-6 w-6 p-0 flex-shrink-0"
+            >
+              {copiado === cupon.codigo ? (
+                <CheckCircle className="h-3 w-3 text-green-500" />
+              ) : (
+                <Copy className="h-3 w-3" />
+              )}
+            </Button>
+          </div>
+          <Switch
+            checked={cupon.activo}
+            onCheckedChange={() => onToggle(cupon.id)}
+            disabled={isButtonLoading(`toggle-${cupon.id}`)}
+          />
+        </div>
+
+        {/* Descuento + aplicabilidad */}
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <span className="font-bold text-primary text-lg">
+            {cupon.tipo === "porcentaje"
+              ? `${cupon.valor}%`
+              : `Bs. ${cupon.valor}`}
+          </span>
+          <div className="flex gap-1 flex-wrap">
+            {cupon.aplicableA.includes("servicios") && (
+              <Badge variant="secondary" className="text-[10px]">
+                Servicios
+              </Badge>
+            )}
+            {cupon.aplicableA.includes("productos") && (
+              <Badge variant="secondary" className="text-[10px]">
+                Productos
+              </Badge>
+            )}
+          </div>
+        </div>
+
+        {/* Descripción */}
+        {cupon.descripcion && (
+          <p className="text-xs text-muted-foreground line-clamp-2">
+            {cupon.descripcion}
+          </p>
+        )}
+
+        {/* Vigencia + Usos */}
+        <div className="grid grid-cols-2 gap-2 text-xs bg-muted/40 rounded-md p-2">
+          <div>
+            <p className="text-[10px] text-muted-foreground">Vigencia</p>
+            <p className="truncate">
+              {formatearFecha(cupon.fechaInicio)} →{" "}
+              {formatearFecha(cupon.fechaExpiracion)}
+            </p>
+          </div>
+          <div>
+            <p className="text-[10px] text-muted-foreground">Usos</p>
+            <p>
+              {cupon.usosActuales} / {cupon.usosMaximos || "∞"}
+            </p>
+            <div className="w-full bg-muted rounded-full h-1 mt-1">
+              <div
+                className="bg-primary rounded-full h-1"
+                style={{
+                  width: cupon.usosMaximos
+                    ? `${Math.min(
+                        (cupon.usosActuales / cupon.usosMaximos) * 100,
+                        100
+                      )}%`
+                    : "0%",
+                }}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Empleado + Sucursales */}
+        <div className="space-y-1 text-xs">
+          <div className="flex items-center gap-1">
+            <User className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+            {cupon.empleadoId ? (
+              <span className="truncate">{cupon.empleadoNombre}</span>
+            ) : (
+              <span className="text-muted-foreground">General</span>
+            )}
+          </div>
+          <div className="flex items-start gap-1">
+            <Store className="h-3 w-3 text-muted-foreground flex-shrink-0 mt-0.5" />
+            <span className="text-muted-foreground line-clamp-2">
+              {getSucursalesNombres(cupon.sucursalesIds) || "—"}
+            </span>
+          </div>
+        </div>
+
+        {/* Acciones */}
+        <div className="flex gap-2 pt-1 border-t">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onEdit(cupon)}
+            className="flex-1 h-8 text-xs gap-1"
+          >
+            <Edit2 className="h-3.5 w-3.5" />
+            Editar
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onDelete(cupon.id)}
+            disabled={isButtonLoading(`delete-${cupon.id}`)}
+            className="h-8 text-xs gap-1 text-red-500 border-red-500/30 hover:bg-red-500/10"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export function Cupones() {
+  const isMobile = useIsMobile();
   const [loading, setLoading] = useState<boolean>(true);
   const [cupones, setCupones] = useState<Cupon[]>([]);
   const [sucursales, setSucursales] = useState<Sucursal[]>([]);
@@ -109,11 +284,9 @@ export function Cupones() {
     {}
   );
 
-  // ⭐ Estados para el buscador de empleados
   const [busquedaEmpleado, setBusquedaEmpleado] = useState("");
   const [mostrarListaEmpleados, setMostrarListaEmpleados] = useState(false);
 
-  // ✅ Tipo inicia vacío, empleadoId inicia null
   const [formData, setFormData] = useState<CuponFormDataLocal>({
     codigo: "",
     tipo: "",
@@ -171,13 +344,11 @@ export function Cupones() {
     return loadingButtons[buttonId] || false;
   };
 
-  // Helper para castear al tipo esperado por el API
   const toApiFormData = (data: CuponFormDataLocal): CuponFormData => ({
     ...data,
     tipo: (data.tipo || "porcentaje") as "porcentaje" | "monto_fijo",
   });
 
-  // ⭐ Filtro de empleados para el buscador del select
   const empleadosFiltrados = useMemo(() => {
     const term = busquedaEmpleado.toLowerCase().trim();
     if (!term) return empleados;
@@ -425,7 +596,7 @@ export function Cupones() {
       </div>
 
       {/* Tarjetas de resumen */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Cupones</CardTitle>
@@ -512,9 +683,7 @@ export function Cupones() {
             </DialogHeader>
 
             <div className="space-y-4 py-4">
-              {/* ============================================ */}
               {/* SECCIÓN: Identificación */}
-              {/* ============================================ */}
               <div className="space-y-4 p-3 bg-muted/30 rounded-lg">
                 <div className="flex items-center gap-2">
                   <Tag className="h-4 w-4 text-primary" />
@@ -575,9 +744,7 @@ export function Cupones() {
                 </div>
               </div>
 
-              {/* ============================================ */}
               {/* SECCIÓN: Descuento */}
-              {/* ============================================ */}
               <div className="space-y-4 p-3 bg-muted/30 rounded-lg">
                 <div className="flex items-center gap-2">
                   <Percent className="h-4 w-4 text-primary" />
@@ -676,9 +843,7 @@ export function Cupones() {
                 </div>
               </div>
 
-              {/* ============================================ */}
               {/* SECCIÓN: Vigencia */}
-              {/* ============================================ */}
               <div className="space-y-4 p-3 bg-muted/30 rounded-lg">
                 <div className="flex items-center gap-2">
                   <Calendar className="h-4 w-4 text-primary" />
@@ -744,9 +909,7 @@ export function Cupones() {
                 </div>
               </div>
 
-              {/* ============================================ */}
               {/* SECCIÓN: Aplicabilidad */}
-              {/* ============================================ */}
               <div className="space-y-4 p-3 bg-muted/30 rounded-lg">
                 <div className="flex items-center gap-2">
                   <Package className="h-4 w-4 text-primary" />
@@ -825,9 +988,7 @@ export function Cupones() {
                 </p>
               </div>
 
-              {/* ============================================ */}
-              {/* SECCIÓN: Empleado asignado (con buscador) */}
-              {/* ============================================ */}
+              {/* SECCIÓN: Empleado asignado */}
               <div className="space-y-4 p-3 bg-muted/30 rounded-lg">
                 <div className="flex items-center gap-2">
                   <UserCircle className="h-4 w-4 text-primary" />
@@ -842,7 +1003,6 @@ export function Cupones() {
                   </Label>
 
                   <div className="relative">
-                    {/* Botón / trigger del select */}
                     <button
                       type="button"
                       id="empleado"
@@ -868,17 +1028,14 @@ export function Cupones() {
                       <span className="text-muted-foreground text-xs">▼</span>
                     </button>
 
-                    {/* Dropdown con buscador */}
                     {mostrarListaEmpleados && (
                       <>
-                        {/* Overlay para cerrar al hacer click fuera */}
                         <div
                           className="fixed inset-0 z-40"
                           onClick={() => setMostrarListaEmpleados(false)}
                         />
 
                         <div className="absolute z-50 mt-1 w-full rounded-md border border-input bg-popover shadow-lg">
-                          {/* Input de búsqueda */}
                           <div className="p-2 border-b border-input">
                             <Input
                               placeholder="Buscar empleado..."
@@ -891,9 +1048,7 @@ export function Cupones() {
                             />
                           </div>
 
-                          {/* Lista de opciones */}
                           <div className="max-h-56 overflow-y-auto py-1">
-                            {/* Opción "Ninguno" */}
                             <button
                               type="button"
                               onClick={() => {
@@ -975,9 +1130,7 @@ export function Cupones() {
                 )}
               </div>
 
-              {/* ============================================ */}
               {/* SECCIÓN: Sucursales */}
-              {/* ============================================ */}
               <div className="space-y-4 p-3 bg-muted/30 rounded-lg">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -1096,7 +1249,7 @@ export function Cupones() {
         </Dialog>
       </div>
 
-      {/* Tabla de cupones */}
+      {/* Lista de cupones */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-primary">
@@ -1111,155 +1264,181 @@ export function Cupones() {
           <CardDescription>Todos los cupones del sistema</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="border-border">
-                  <TableHead>Código</TableHead>
-                  <TableHead>Descuento</TableHead>
-                  <TableHead>Descripción</TableHead>
-                  <TableHead>Vigencia</TableHead>
-                  <TableHead>Usos</TableHead>
-                  <TableHead>Aplica a</TableHead>
-                  <TableHead>Empleado</TableHead>
-                  <TableHead>Sucursales</TableHead>
-                  <TableHead>Estado</TableHead>
-                  <TableHead className="text-right">Acciones</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {cupones.map((cupon) => (
-                  <TableRow key={cupon.id} className="border-border">
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <code className="px-2 py-1 bg-muted rounded font-mono text-sm">
-                          {cupon.codigo}
-                        </code>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => copiarCodigo(cupon.codigo)}
-                          className="h-6 w-6 p-0"
-                        >
-                          {copiado === cupon.codigo ? (
-                            <CheckCircle className="h-3 w-3 text-green-500" />
-                          ) : (
-                            <Copy className="h-3 w-3" />
-                          )}
-                        </Button>
-                      </div>
-                    </TableCell>
-                    <TableCell className="font-bold text-primary">
-                      {cupon.tipo === "porcentaje"
-                        ? `${cupon.valor}%`
-                        : `Bs. ${cupon.valor}`}
-                    </TableCell>
-                    <TableCell className="max-w-[200px] truncate">
-                      {cupon.descripcion || (
-                        <span className="text-muted-foreground">—</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <div className="text-xs">
-                        <div>Inicio: {formatearFecha(cupon.fechaInicio)}</div>
-                        <div>Expira: {formatearFecha(cupon.fechaExpiracion)}</div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="text-sm">
-                        {cupon.usosActuales} / {cupon.usosMaximos || "∞"}
-                      </div>
-                      <div className="w-full bg-muted rounded-full h-1 mt-1">
-                        <div
-                          className="bg-primary rounded-full h-1"
-                          style={{
-                            width: cupon.usosMaximos
-                              ? `${Math.min(
-                                  (cupon.usosActuales / cupon.usosMaximos) * 100,
-                                  100
-                                )}%`
-                              : "0%",
-                          }}
-                        />
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-1 flex-wrap">
-                        {cupon.aplicableA.includes("servicios") && (
-                          <Badge variant="secondary" className="text-xs">
-                            Servicios
-                          </Badge>
-                        )}
-                        {cupon.aplicableA.includes("productos") && (
-                          <Badge variant="secondary" className="text-xs">
-                            Productos
-                          </Badge>
-                        )}
-                      </div>
-                    </TableCell>
-
-                    {/* ⭐ Columna Empleado */}
-                    <TableCell>
-                      {cupon.empleadoId ? (
-                        <Badge
-                          variant="outline"
-                          className="text-xs border-primary/40 text-primary"
-                        >
-                          <User className="h-3 w-3 mr-1" />
-                          {cupon.empleadoNombre}
-                        </Badge>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">
-                          General
-                        </span>
-                      )}
-                    </TableCell>
-
-                    <TableCell className="max-w-[200px]">
-                      <div className="text-xs text-muted-foreground truncate">
-                        {getSucursalesNombres(cupon.sucursalesIds) || "—"}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center">
-                        <Switch
-                          checked={cupon.activo}
-                          onCheckedChange={() => toggleActivo(cupon.id)}
-                          disabled={isButtonLoading(`toggle-${cupon.id}`)}
-                        />
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleEdit(cupon)}
-                        >
-                          <Edit2 className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDelete(cupon.id)}
-                          disabled={isButtonLoading(`delete-${cupon.id}`)}
-                        >
-                          <Trash2 className="h-4 w-4 text-red-500" />
-                        </Button>
-                      </div>
-                    </TableCell>
+          {isMobile ? (
+            /* ✅ MÓVIL: cards apiladas */
+            <div className="space-y-3">
+              {cupones.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Ticket size={48} className="mx-auto mb-4 opacity-50" />
+                  <p>No hay cupones registrados</p>
+                </div>
+              ) : (
+                cupones.map((cupon) => (
+                  <CuponCard
+                    key={cupon.id}
+                    cupon={cupon}
+                    onEdit={handleEdit}
+                    onDelete={handleDelete}
+                    onToggle={toggleActivo}
+                    onCopy={copiarCodigo}
+                    copiado={copiado}
+                    isButtonLoading={isButtonLoading}
+                    getSucursalesNombres={getSucursalesNombres}
+                  />
+                ))
+              )}
+            </div>
+          ) : (
+            /* DESKTOP: tabla */
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-border">
+                    <TableHead>Código</TableHead>
+                    <TableHead>Descuento</TableHead>
+                    <TableHead>Descripción</TableHead>
+                    <TableHead>Vigencia</TableHead>
+                    <TableHead>Usos</TableHead>
+                    <TableHead>Aplica a</TableHead>
+                    <TableHead>Empleado</TableHead>
+                    <TableHead>Sucursales</TableHead>
+                    <TableHead>Estado</TableHead>
+                    <TableHead className="text-right">Acciones</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {cupones.map((cupon) => (
+                    <TableRow key={cupon.id} className="border-border">
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <code className="px-2 py-1 bg-muted rounded font-mono text-sm">
+                            {cupon.codigo}
+                          </code>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => copiarCodigo(cupon.codigo)}
+                            className="h-6 w-6 p-0"
+                          >
+                            {copiado === cupon.codigo ? (
+                              <CheckCircle className="h-3 w-3 text-green-500" />
+                            ) : (
+                              <Copy className="h-3 w-3" />
+                            )}
+                          </Button>
+                        </div>
+                      </TableCell>
+                      <TableCell className="font-bold text-primary">
+                        {cupon.tipo === "porcentaje"
+                          ? `${cupon.valor}%`
+                          : `Bs. ${cupon.valor}`}
+                      </TableCell>
+                      <TableCell className="max-w-[200px] truncate">
+                        {cupon.descripcion || (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-xs">
+                          <div>Inicio: {formatearFecha(cupon.fechaInicio)}</div>
+                          <div>Expira: {formatearFecha(cupon.fechaExpiracion)}</div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-sm">
+                          {cupon.usosActuales} / {cupon.usosMaximos || "∞"}
+                        </div>
+                        <div className="w-full bg-muted rounded-full h-1 mt-1">
+                          <div
+                            className="bg-primary rounded-full h-1"
+                            style={{
+                              width: cupon.usosMaximos
+                                ? `${Math.min(
+                                    (cupon.usosActuales / cupon.usosMaximos) * 100,
+                                    100
+                                  )}%`
+                                : "0%",
+                            }}
+                          />
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-1 flex-wrap">
+                          {cupon.aplicableA.includes("servicios") && (
+                            <Badge variant="secondary" className="text-xs">
+                              Servicios
+                            </Badge>
+                          )}
+                          {cupon.aplicableA.includes("productos") && (
+                            <Badge variant="secondary" className="text-xs">
+                              Productos
+                            </Badge>
+                          )}
+                        </div>
+                      </TableCell>
 
-            {cupones.length === 0 && (
-              <div className="text-center py-8 text-muted-foreground">
-                <Ticket size={48} className="mx-auto mb-4 opacity-50" />
-                <p>No hay cupones registrados</p>
-              </div>
-            )}
-          </div>
+                      <TableCell>
+                        {cupon.empleadoId ? (
+                          <Badge
+                            variant="outline"
+                            className="text-xs border-primary/40 text-primary"
+                          >
+                            <User className="h-3 w-3 mr-1" />
+                            {cupon.empleadoNombre}
+                          </Badge>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">
+                            General
+                          </span>
+                        )}
+                      </TableCell>
+
+                      <TableCell className="max-w-[200px]">
+                        <div className="text-xs text-muted-foreground truncate">
+                          {getSucursalesNombres(cupon.sucursalesIds) || "—"}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center">
+                          <Switch
+                            checked={cupon.activo}
+                            onCheckedChange={() => toggleActivo(cupon.id)}
+                            disabled={isButtonLoading(`toggle-${cupon.id}`)}
+                          />
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEdit(cupon)}
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDelete(cupon.id)}
+                            disabled={isButtonLoading(`delete-${cupon.id}`)}
+                          >
+                            <Trash2 className="h-4 w-4 text-red-500" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+
+              {cupones.length === 0 && (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Ticket size={48} className="mx-auto mb-4 opacity-50" />
+                  <p>No hay cupones registrados</p>
+                </div>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

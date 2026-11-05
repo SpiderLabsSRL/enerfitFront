@@ -3,50 +3,78 @@
 @tailwind utilities;
 
 /* ============================================ */
-/* ENERFIT Design System - Black & Matte Yellow Theme */
-/* Amarillo principal: #F7B800 → hsl(44, 100%, 48%) */
+/* ENERFIT Design System - Jungle Green & Champagne Gold Theme */
+/* ============================================ */
+/* Paleta:
+   Negro profundo:    #090B09 → hsl(120, 10%, 4%)
+   Verde jungla:      #123D2B → hsl(153, 54%, 15%)
+   Verde esmeralda:   #244C38 → hsl(150, 36%, 22%)
+   Dorado champán:    #C6A15B → hsl(39, 48%, 57%)
+   Nogal oscuro:      #30251C → hsl(27, 26%, 15%)
+   Grafito:           #171C19 → hsl(140, 10%, 10%)
+   Marfil cálido:     #D8D0BD → hsl(43, 25%, 79%)
+*/
 /* ============================================ */
 
 @layer base {
   :root {
-    --background: 0 0% 5%;
-    --foreground: 44 100% 90%;
-    --card: 0 0% 10%;
-    --card-foreground: 44 100% 90%;
-    --popover: 0 0% 8%;
-    --popover-foreground: 44 100% 90%;
-    --primary: 44 100% 48%;
-    --primary-foreground: 0 0% 5%;
-    --secondary: 0 0% 15%;
-    --secondary-foreground: 44 100% 90%;
-    --muted: 0 0% 20%;
-    --muted-foreground: 44 60% 70%;
-    --accent: 44 100% 48%;
-    --accent-foreground: 0 0% 5%;
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 44 100% 90%;
-    --success: 120 50% 50%;
-    --success-foreground: 44 100% 90%;
-    --warning: 38 92% 50%;
-    --warning-foreground: 0 0% 5%;
-    --border: 0 0% 25%;
-    --input: 0 0% 12%;
-    --ring: 44 100% 48%;
+    /* Base */
+    --background: 120 10% 4%;              /* Negro profundo #090B09 */
+    --foreground: 43 25% 79%;              /* Marfil cálido #D8D0BD */
+
+    /* Superficies */
+    --card: 140 10% 10%;                   /* Grafito #171C19 */
+    --card-foreground: 43 25% 79%;
+    --popover: 140 10% 8%;
+    --popover-foreground: 43 25% 79%;
+
+    /* Primario = Dorado champán (acento principal) */
+    --primary: 39 48% 57%;                 /* #C6A15B */
+    --primary-foreground: 120 10% 4%;      /* texto oscuro sobre dorado */
+
+    /* Secundario = Verde esmeralda */
+    --secondary: 150 36% 22%;              /* #244C38 */
+    --secondary-foreground: 43 25% 90%;
+
+    /* Muted = Verde jungla profundo */
+    --muted: 153 54% 15%;                  /* #123D2B */
+    --muted-foreground: 43 25% 70%;
+
+    /* Acento = Dorado champán */
+    --accent: 39 48% 57%;
+    --accent-foreground: 120 10% 4%;
+
+    /* Estados */
+    --destructive: 0 65% 50%;
+    --destructive-foreground: 43 25% 90%;
+    --success: 150 40% 40%;
+    --success-foreground: 43 25% 90%;
+    --warning: 39 70% 55%;
+    --warning-foreground: 120 10% 4%;
+
+    /* Bordes e inputs */
+    --border: 150 20% 20%;                 /* verde sutil sobre grafito */
+    --input: 140 10% 12%;
+    --ring: 39 48% 57%;                    /* ring dorado */
+
+    /* Radio y gradientes */
     --radius: 0.75rem;
-    --gradient-primary: linear-gradient(135deg, hsl(44 100% 48%), hsl(44 100% 40%));
-    --gradient-dark: linear-gradient(135deg, hsl(0 0% 5%), hsl(0 0% 10%));
-    --gradient-accent: linear-gradient(90deg, hsl(44 100% 48% / 0.1), hsl(44 100% 48% / 0.05));
-    --shadow-glow: 0 0 20px hsl(44 100% 48% / 0.3);
-    --shadow-card: 0 4px 20px hsl(0 0% 0% / 0.4);
+    --gradient-primary: linear-gradient(135deg, hsl(39 48% 57%), hsl(39 48% 45%));
+    --gradient-dark: linear-gradient(135deg, hsl(120 10% 4%), hsl(153 54% 15%));
+    --gradient-accent: linear-gradient(90deg, hsl(39 48% 57% / 0.12), hsl(39 48% 57% / 0.05));
+    --shadow-glow: 0 0 20px hsl(39 48% 57% / 0.28);
+    --shadow-card: 0 4px 20px hsl(0 0% 0% / 0.45);
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    --sidebar-background: 0 0% 5%;
-    --sidebar-foreground: 44 100% 90%;
-    --sidebar-primary: 44 100% 48%;
-    --sidebar-primary-foreground: 0 0% 5%;
-    --sidebar-accent: 0 0% 15%;
-    --sidebar-accent-foreground: 44 100% 90%;
-    --sidebar-border: 0 0% 25%;
-    --sidebar-ring: 44 100% 48%;
+
+    /* Sidebar - usa verde jungla para diferenciarse del fondo */
+    --sidebar-background: 153 54% 12%;
+    --sidebar-foreground: 43 25% 85%;
+    --sidebar-primary: 39 48% 57%;
+    --sidebar-primary-foreground: 120 10% 4%;
+    --sidebar-accent: 150 36% 22%;
+    --sidebar-accent-foreground: 43 25% 90%;
+    --sidebar-border: 150 25% 22%;
+    --sidebar-ring: 39 48% 57%;
   }
 }
 
@@ -81,28 +109,28 @@
 input,
 textarea,
 select {
-  background-color: hsl(0 0% 12%) !important;
-  border-color: hsl(0 0% 25%) !important;
-  color: hsl(44 100% 90%) !important;
+  background-color: hsl(140 10% 12%) !important;   /* grafito más claro */
+  border-color: hsl(150 20% 20%) !important;
+  color: hsl(43 25% 85%) !important;              /* marfil */
 }
 
 input:hover,
 textarea:hover,
 select:hover {
-  border-color: hsl(44 100% 48%) !important;
+  border-color: hsl(39 48% 57%) !important;       /* dorado */
 }
 
 input:focus,
 textarea:focus,
 select:focus {
-  border-color: hsl(44 100% 48%) !important;
+  border-color: hsl(39 48% 57%) !important;
   outline: none !important;
-  box-shadow: 0 0 0 2px hsl(44 100% 48% / 0.3) !important;
+  box-shadow: 0 0 0 2px hsl(39 48% 57% / 0.3) !important;
 }
 
 input::placeholder,
 textarea::placeholder {
-  color: hsl(44 60% 70%) !important;
+  color: hsl(43 25% 70%) !important;
   opacity: 0.7 !important;
 }
 
@@ -110,9 +138,9 @@ input:-webkit-autofill,
 input:-webkit-autofill:hover,
 input:-webkit-autofill:focus,
 input:-webkit-autofill:active {
-  -webkit-box-shadow: 0 0 0 100px hsl(0 0% 12%) inset !important;
-  -webkit-text-fill-color: hsl(44 100% 90%) !important;
-  caret-color: hsl(44 100% 90%) !important;
+  -webkit-box-shadow: 0 0 0 100px hsl(140 10% 12%) inset !important;
+  -webkit-text-fill-color: hsl(43 25% 85%) !important;
+  caret-color: hsl(43 25% 85%) !important;
   transition: background-color 5000s ease-in-out 0s !important;
 }
 
@@ -121,9 +149,9 @@ input:-webkit-autofill:active {
 /* ============================================ */
 
 input[type="number"] {
-  background-color: hsl(0 0% 12%) !important;
-  border-color: hsl(0 0% 25%) !important;
-  color: hsl(44 100% 90%) !important;
+  background-color: hsl(140 10% 12%) !important;
+  border-color: hsl(150 20% 20%) !important;
+  color: hsl(43 25% 85%) !important;
   -moz-appearance: textfield !important;
   appearance: textfield !important;
 }
@@ -136,31 +164,31 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 
 input[type="number"]:focus {
-  border-color: hsl(44 100% 48%) !important;
+  border-color: hsl(39 48% 57%) !important;
   outline: none !important;
-  box-shadow: 0 0 0 2px hsl(44 100% 48% / 0.3) !important;
+  box-shadow: 0 0 0 2px hsl(39 48% 57% / 0.3) !important;
 }
 
 /* ============================================ */
-/* ESTILOS PARA INPUT TYPE="time" Y SU POPUP */
+/* ESTILOS PARA INPUT TYPE="time" */
 /* ============================================ */
 
 input[type="time"] {
   color-scheme: dark !important;
-  background-color: hsl(0 0% 12%) !important;
-  border-color: hsl(0 0% 25%) !important;
-  color: hsl(44 100% 90%) !important;
+  background-color: hsl(140 10% 12%) !important;
+  border-color: hsl(150 20% 20%) !important;
+  color: hsl(43 25% 85%) !important;
 }
 
-/* Ícono del reloj en AMARILLO #F7B800 */
+/* Ícono del reloj en DORADO CHAMPÁN #C6A15B */
 input[type="time"]::-webkit-calendar-picker-indicator {
-  filter: brightness(0) saturate(100%) invert(78%) sepia(96%) saturate(2000%) hue-rotate(2deg) brightness(101%) contrast(98%) !important;
+  filter: brightness(0) saturate(100%) invert(70%) sepia(35%) saturate(650%) hue-rotate(5deg) brightness(95%) contrast(90%) !important;
   cursor: pointer !important;
   opacity: 1 !important;
 }
 
 input[type="time"]::-webkit-calendar-picker-indicator:hover {
-  filter: brightness(0) saturate(100%) invert(85%) sepia(70%) saturate(1500%) hue-rotate(2deg) brightness(105%) contrast(95%) !important;
+  filter: brightness(0) saturate(100%) invert(80%) sepia(30%) saturate(700%) hue-rotate(5deg) brightness(100%) contrast(88%) !important;
   transform: scale(1.05);
 }
 
@@ -168,54 +196,37 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
 /* ESTILOS PARA EL POPUP DEL INPUT TIME */
 /* ============================================ */
 
-/* El contenedor principal del popup de hora */
 ::-webkit-datetime-edit-fields-wrapper,
 ::-webkit-datetime-edit-text,
 ::-webkit-datetime-edit-hour-field,
 ::-webkit-datetime-edit-minute-field,
 ::-webkit-datetime-edit-ampm-field {
-  color: hsl(44 100% 90%) !important;
+  color: hsl(43 25% 85%) !important;
   background-color: transparent !important;
 }
 
-/* El popup que aparece al hacer clic (selector de hora) */
 input[type="time"]::-webkit-calendar-picker-indicator:focus + ::-webkit-datetime-edit,
 input[type="time"]:focus::-webkit-calendar-picker-indicator {
   outline: none;
 }
 
-/* Forzar el tema oscuro del popup nativo */
 input[type="time"] {
-  background-color: hsl(0 0% 12%) !important;
+  background-color: hsl(140 10% 12%) !important;
 }
 
-/* No podemos modificar directamente el popup de hora del navegador,
-   pero podemos aplicar estilos globales para inputs time */
 @media (prefers-color-scheme: dark) {
   input[type="time"] {
     color-scheme: dark;
   }
 }
 
-/* ============================================ */
-/* ESTILOS PARA EL SELECTOR DE HORA (POPUP) - Chrome/Edge */
-/* ============================================ */
-
-/* El popup completo del time picker */
 input[type="time"]::-webkit-calendar-picker-indicator {
   position: relative;
 }
 
-/* Para navegadores basados en Chromium, el popup de hora tiene estas clases internas */
-/* Esto cambia el fondo del popup */
 input[type="time"] {
   -webkit-appearance: none;
 }
-
-/* ============================================ */
-/* OPCIONAL: Usar un selector de hora personalizado */
-/* Si el popup nativo sigue dando problemas, puedes forzar un picker personalizado */
-/* ============================================ */
 
 input[type="time"] {
   position: relative;
@@ -230,16 +241,16 @@ input[type="datetime-local"],
 input[type="month"],
 input[type="week"] {
   color-scheme: dark !important;
-  background-color: hsl(0 0% 12%) !important;
-  border-color: hsl(0 0% 25%) !important;
-  color: hsl(44 100% 90%) !important;
+  background-color: hsl(140 10% 12%) !important;
+  border-color: hsl(150 20% 20%) !important;
+  color: hsl(43 25% 85%) !important;
 }
 
 input[type="date"]::-webkit-calendar-picker-indicator,
 input[type="datetime-local"]::-webkit-calendar-picker-indicator,
 input[type="month"]::-webkit-calendar-picker-indicator,
 input[type="week"]::-webkit-calendar-picker-indicator {
-  filter: brightness(0) saturate(100%) invert(78%) sepia(96%) saturate(2000%) hue-rotate(2deg) brightness(101%) contrast(98%) !important;
+  filter: brightness(0) saturate(100%) invert(70%) sepia(35%) saturate(650%) hue-rotate(5deg) brightness(95%) contrast(90%) !important;
   cursor: pointer !important;
   opacity: 1 !important;
 }
@@ -248,7 +259,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover,
 input[type="datetime-local"]::-webkit-calendar-picker-indicator:hover,
 input[type="month"]::-webkit-calendar-picker-indicator:hover,
 input[type="week"]::-webkit-calendar-picker-indicator:hover {
-  filter: brightness(0) saturate(100%) invert(85%) sepia(70%) saturate(1500%) hue-rotate(2deg) brightness(105%) contrast(95%) !important;
+  filter: brightness(0) saturate(100%) invert(80%) sepia(30%) saturate(700%) hue-rotate(5deg) brightness(100%) contrast(88%) !important;
   transform: scale(1.05);
 }
 
@@ -256,9 +267,9 @@ input[type="date"]:focus,
 input[type="datetime-local"]:focus,
 input[type="month"]:focus,
 input[type="week"]:focus {
-  border-color: hsl(44 100% 48%) !important;
+  border-color: hsl(39 48% 57%) !important;
   outline: none !important;
-  box-shadow: 0 0 0 2px hsl(44 100% 48% / 0.3) !important;
+  box-shadow: 0 0 0 2px hsl(39 48% 57% / 0.3) !important;
 }
 
 /* ============================================ */
@@ -266,29 +277,29 @@ input[type="week"]:focus {
 /* ============================================ */
 
 select {
-  background-color: hsl(0 0% 12%) !important;
-  border-color: hsl(0 0% 25%) !important;
-  color: hsl(44 100% 90%) !important;
+  background-color: hsl(140 10% 12%) !important;
+  border-color: hsl(150 20% 20%) !important;
+  color: hsl(43 25% 85%) !important;
   cursor: pointer;
 }
 
 select option {
-  background-color: hsl(0 0% 12%) !important;
-  color: hsl(44 100% 90%) !important;
+  background-color: hsl(140 10% 12%) !important;
+  color: hsl(43 25% 85%) !important;
 }
 
 select option:hover,
 select option:focus,
 select option:active,
 select option:checked {
-  background-color: hsl(44 100% 48%) !important;
-  color: hsl(0 0% 5%) !important;
+  background-color: hsl(39 48% 57%) !important;   /* dorado */
+  color: hsl(120 10% 4%) !important;              /* negro profundo */
 }
 
 select:focus {
-  border-color: hsl(44 100% 48%) !important;
+  border-color: hsl(39 48% 57%) !important;
   outline: none !important;
-  box-shadow: 0 0 0 2px hsl(44 100% 48% / 0.3) !important;
+  box-shadow: 0 0 0 2px hsl(39 48% 57% / 0.3) !important;
 }
 
 /* ============================================ */
@@ -308,13 +319,13 @@ select:disabled {
 
 input[aria-invalid="true"],
 input.error {
-  border-color: hsl(0 84% 60%) !important;
+  border-color: hsl(0 65% 50%) !important;
 }
 
 input[aria-invalid="true"]:focus,
 input.error:focus {
-  border-color: hsl(0 84% 60%) !important;
-  box-shadow: 0 0 0 2px hsl(0 84% 60% / 0.3) !important;
+  border-color: hsl(0 65% 50%) !important;
+  box-shadow: 0 0 0 2px hsl(0 65% 50% / 0.3) !important;
 }
 
 /* ============================================ */
@@ -327,20 +338,20 @@ input.error:focus {
 }
 
 ::-webkit-scrollbar-track {
-  background: hsl(0 0% 10%);
+  background: hsl(140 10% 8%);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: hsl(44 100% 48% / 0.5);
+  background: hsl(39 48% 57% / 0.5);   /* dorado translúcido */
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: hsl(44 100% 48%);
+  background: hsl(39 48% 57%);          /* dorado pleno */
 }
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: hsl(44 100% 48% / 0.5) hsl(0 0% 10%);
+  scrollbar-color: hsl(39 48% 57% / 0.5) hsl(140 10% 8%);
 }

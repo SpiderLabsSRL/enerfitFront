@@ -575,11 +575,12 @@ export function AdminLayout() {
   };
 
   const SidebarContent = () => (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full min-h-0">
       <div className="h-[73px] flex-shrink-0 hidden lg:block"></div>
 
+      {/* ✅ Nav: flex-1 + min-h-0 para que SOLO esto scrollee */}
       <nav
-        className={`px-4 pb-4 space-y-2 flex-1 overflow-y-auto custom-scrollbar ${
+        className={`px-4 pb-4 space-y-2 flex-1 min-h-0 overflow-y-auto custom-scrollbar ${
           sidebarCollapsed ? "px-2" : ""
         }`}
       >
@@ -656,9 +657,10 @@ export function AdminLayout() {
         </div>
       </nav>
 
+      {/* ✅ Footer FIJO: no scrollea, queda siempre visible dentro del sidebar */}
       {!sidebarCollapsed && (
         <>
-          <div className="p-4 border-t border-border space-y-3">
+          <div className="flex-shrink-0 p-4 border-t border-border space-y-3">
             <div className="space-y-1">
               <Button
                 variant="outline"
@@ -676,7 +678,7 @@ export function AdminLayout() {
             </div>
           </div>
 
-          <div className="p-4 border-t border-border">
+          <div className="flex-shrink-0 p-4 border-t border-border">
             <p className="text-xs text-muted-foreground text-center">
               Realizado por SPIDERLABS SYSTEMS S.R.L.
             </p>
@@ -864,7 +866,8 @@ export function AdminLayout() {
               className="fixed inset-0 bg-black/50 z-40 lg:hidden backdrop-blur-sm"
               onClick={() => setSidebarOpen(false)}
             />
-            <aside className="fixed top-[73px] left-0 w-64 h-[calc(100vh-73px)] bg-card border-r border-border overflow-y-auto z-50 lg:hidden flex flex-col shadow-xl animate-in slide-in-from-left-2 duration-200">
+            {/* ✅ CAMBIO: overflow-hidden (antes overflow-y-auto) para que solo el nav scrollee */}
+            <aside className="fixed top-[73px] left-0 w-64 h-[calc(100vh-73px)] bg-card border-r border-border overflow-hidden z-50 lg:hidden flex flex-col shadow-xl animate-in slide-in-from-left-2 duration-200">
               <SidebarContent />
             </aside>
           </>

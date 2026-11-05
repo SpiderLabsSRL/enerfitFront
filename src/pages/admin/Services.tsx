@@ -67,6 +67,30 @@ import {
   type ServiceFormData,
 } from "../../api/Servicesapi";
 
+// ============================================
+// HOOK: detectar móvil
+// ============================================
+function useIsMobile(breakpoint = 768) {
+  const [isMobile, setIsMobile] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return window.matchMedia(`(max-width: ${breakpoint - 1}px)`).matches;
+  });
+
+  useEffect(() => {
+    const mq = window.matchMedia(`(max-width: ${breakpoint - 1}px)`);
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    if (mq.addEventListener) mq.addEventListener("change", handler);
+    else mq.addListener(handler);
+    setIsMobile(mq.matches);
+    return () => {
+      if (mq.removeEventListener) mq.removeEventListener("change", handler);
+      else mq.removeListener(handler);
+    };
+  }, [breakpoint]);
+
+  return isMobile;
+}
+
 const WEEKDAYS = [
   { id: "monday", name: "Lunes" },
   { id: "tuesday", name: "Martes" },
@@ -77,7 +101,6 @@ const WEEKDAYS = [
   { id: "sunday", name: "Domingo" },
 ];
 
-// Tipo local para permitir '' como "sin selección" en tipoDuracion
 type TipoDuracionLocal = "dias" | "meses" | "";
 
 interface ServiceFormDataLocal extends Omit<ServiceFormData, "tipoDuracion"> {
@@ -85,6 +108,7 @@ interface ServiceFormDataLocal extends Omit<ServiceFormData, "tipoDuracion"> {
 }
 
 export function Services() {
+  const isMobile = useIsMobile();
   const [services, setServices] = useState<Service[]>([]);
   const [sucursales, setSucursales] = useState<Sucursal[]>([]);
   const [serviceTypes, setServiceTypes] = useState<ServiceType[]>([]);
@@ -94,7 +118,6 @@ export function Services() {
   const [editingService, setEditingService] = useState<Service | null>(null);
   const [viewingService, setViewingService] = useState<Service | null>(null);
 
-  // ✅ CAMBIO: sin selección por defecto en tipoDuracion ni en serviceType
   const [formData, setFormData] = useState<ServiceFormDataLocal>({
     name: "",
     description: "",
@@ -140,7 +163,6 @@ export function Services() {
       setServices(servicesData);
       setSucursales(sucursalesData);
       setServiceTypes(typesData);
-      // ✅ CAMBIO: ya NO se autoselecciona el primer tipo
     } catch (error: any) {
       toast({
         title: "Error",
@@ -224,7 +246,6 @@ export function Services() {
     if (!formData.serviceType) {
       return "Seleccione un tipo de servicio";
     }
-    // ✅ CAMBIO: validar que se haya seleccionado duración (días o meses)
     if (!formData.tipoDuracion) {
       return "Seleccione el tipo de duración (Días o Meses)";
     }
@@ -258,7 +279,6 @@ export function Services() {
     if (formData.hasSpecificDays && formData.specificDays.length === 0) {
       return "Seleccione al menos un día disponible";
     }
-    // ✅ CAMBIO: permitir 0 como valor válido para "personas requeridas"
     if (formData.requiredPeopleEnabled) {
       if (
         formData.requiredPeople === "" ||
@@ -281,7 +301,6 @@ export function Services() {
     }));
   };
 
-  // Helper para castear el formData local al tipo esperado por el API
   const toApiFormData = (data: ServiceFormDataLocal): ServiceFormData => ({
     ...data,
     tipoDuracion: (data.tipoDuracion || "dias") as "dias" | "meses",
@@ -498,7 +517,6 @@ export function Services() {
     }
   `;
 
-  // Componente para el diálogo de detalles
   const ServiceDetailsDialog = ({
     service,
     open,
@@ -695,6 +713,243 @@ export function Services() {
     );
   }
 
+  // ============================================
+  // ✅ CARD DE SERVICIO (MÓVIL)
+  // ============================================
+  const ServiceCard = ({ service }: { service: Service }) => (
+    <Card className="overflow-hidden">
+      <CardContent className="p-3 space-y-2.5">
+        {/* Header: nombre + precio + switch estado */}
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0 flex-1">
+            <h3 className="font-bold text-sm truncate">{service.name}</h3>
+            <Badge variant="outline" className="mt-1 text-[10px]">
+              {getServiceTypeName(service.serviceType)}
+            </Badge>
+          </div>
+          <span className="font-bold text-primary text-base flex-shrink-0">
+            {service.price} Bs.
+          </span>
+        </div>
+
+        {/* Descripción */}
+        {service.description && (
+          <p className="text-xs text-muted-foreground line-clamp-2">
+            {service.description}
+          </p>
+        )}
+
+        {/* Info grid */}
+        <div className="grid grid-cols-2 gap-2 text-xs bg-muted/40 rounded-md p-2">
+          <div>
+            <p className="text-[10px] text-muted-foreground">Ingresos</p>
+            <p className="font-medium flex items-center gap-1">
+              {service.maxEntries === null ? (
+                <>
+                  <Infinity className="h-3 w-3" />
+                  Ilimitado
+                </>
+              ) : (
+                `${service.maxEntries}`
+              )}
+            </p>
+          </div>
+          <div>
+            <p className="text-[10px] text-muted-foreground">Duración</p>
+            <p className="font-medium">
+              {service.cantidadDuracion} {service.tipoDuracion}
+            </p>
+          </div>
+        </div>
+
+        {/* Sucursales */}
+        <div className="flex flex-wrap gap-1">
+          {service.sucursales.slice(0, 2).map((sucursalId) => {
+            const sucursal = sucursales.find(
+              (s) => s.id.toString() === sucursalId
+            );
+            return (
+              <Badge key={sucursalId} variant="outline" className="text-[10px]">
+                {sucursal?.name || sucursalId}
+              </Badge>
+            );
+          })}
+          {service.sucursales.length > 2 && (
+            <Badge variant="outline" className="text-[10px]">
+              +{service.sucursales.length - 2}
+            </Badge>
+          )}
+          {service.multisucursal && (
+            <Badge variant="secondary" className="text-[10px]">
+              <Building2 className="h-3 w-3 mr-1" />
+              Multi
+            </Badge>
+          )}
+        </div>
+
+        {/* Personas requeridas */}
+        {service.requiredPeopleEnabled &&
+          service.requiredPeople !== undefined &&
+          service.requiredPeople !== null && (
+            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+              <Users className="h-3 w-3" />
+              {service.requiredPeople === 0
+                ? "No requiere personas"
+                : `${service.requiredPeople} ${
+                    service.requiredPeople === 1 ? "persona" : "personas"
+                  }`}
+            </div>
+          )}
+
+        {/* Horario */}
+        {(service.hasTimeRange || service.hasSpecificDays) && (
+          <div className="flex flex-wrap gap-1">
+            {service.hasTimeRange && service.startTime && service.endTime && (
+              <Badge variant="secondary" className="text-[10px] gap-1">
+                <Clock className="h-2.5 w-2.5" />
+                {service.startTime} - {service.endTime}
+              </Badge>
+            )}
+            {service.hasSpecificDays &&
+              service.specificDays &&
+              service.specificDays.length > 0 && (
+                <Badge variant="secondary" className="text-[10px] gap-1">
+                  <Calendar className="h-2.5 w-2.5" />
+                  {service.specificDays.length} día(s)
+                </Badge>
+              )}
+          </div>
+        )}
+
+        {/* Estado + Acciones */}
+        <div className="flex items-center justify-between gap-2 pt-2 border-t">
+          {/* Switch con AlertDialog de confirmación */}
+          <div className="flex items-center gap-2">
+            <AlertDialog
+              open={
+                statusChangeDialog.open &&
+                statusChangeDialog.service?.id === service.id
+              }
+              onOpenChange={(open) =>
+                setStatusChangeDialog(
+                  open ? { open, service } : { open: false, service: null }
+                )
+              }
+            >
+              <AlertDialogTrigger asChild>
+                <div>
+                  <Switch
+                    checked={service.isActive}
+                    onCheckedChange={() =>
+                      setStatusChangeDialog({ open: true, service })
+                    }
+                    disabled={isButtonLoading(`toggle-status-${service.id}`)}
+                  />
+                </div>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>
+                    {service.isActive
+                      ? "Desactivar servicio"
+                      : "Activar servicio"}
+                  </AlertDialogTitle>
+                  <AlertDialogDescription>
+                    ¿Estás seguro de que deseas{" "}
+                    {service.isActive ? "desactivar" : "activar"} el servicio "
+                    {service.name}"?
+                    {service.isActive &&
+                      " Los usuarios no podrán adquirir este servicio mientras esté desactivado."}
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel
+                    disabled={isButtonLoading(`toggle-status-${service.id}`)}
+                  >
+                    Cancelar
+                  </AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => handleToggleStatus(service.id)}
+                    disabled={isButtonLoading(`toggle-status-${service.id}`)}
+                  >
+                    {isButtonLoading(`toggle-status-${service.id}`)
+                      ? "Procesando..."
+                      : service.isActive
+                      ? "Desactivar"
+                      : "Activar"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+            <span className="text-xs">
+              {service.isActive ? "Activo" : "Inactivo"}
+            </span>
+          </div>
+
+          {/* Botones de acciones */}
+          <div className="flex gap-1.5">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 w-8 p-0"
+              onClick={() => setViewingService(service)}
+            >
+              <Eye className="h-4 w-4" />
+            </Button>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => startEdit(service)}
+              className="h-8 w-8 p-0"
+              disabled={isButtonLoading(`edit-service-${service.id}`)}
+            >
+              <Edit3 className="h-4 w-4" />
+            </Button>
+
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  className="h-8 w-8 p-0"
+                  disabled={isButtonLoading(`delete-service-${service.id}`)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Eliminar servicio</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    ¿Estás seguro de que deseas eliminar {service.name}? Esta
+                    acción no se puede deshacer.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel
+                    disabled={isButtonLoading(`delete-service-${service.id}`)}
+                  >
+                    Cancelar
+                  </AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => handleDeleteService(service.id)}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    disabled={isButtonLoading(`delete-service-${service.id}`)}
+                  >
+                    {isButtonLoading(`delete-service-${service.id}`)
+                      ? "Eliminando..."
+                      : "Eliminar"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+
   return (
     <div className="space-y-6">
       <style>{scrollbarStyles}</style>
@@ -860,7 +1115,6 @@ export function Services() {
                   <Calendar className="h-4 w-4 mr-2" />
                   Duración <span className="text-red-500">*</span>
                 </Label>
-                {/* ✅ CAMBIO: ningún botón seleccionado por defecto */}
                 <div className="flex gap-3">
                   <button
                     type="button"
@@ -1020,7 +1274,6 @@ export function Services() {
                   />
                 </div>
 
-                {/* ✅ CAMBIO: aviso cuando el switch está apagado */}
                 {!formData.requiredPeopleEnabled && (
                   <div className="pl-6">
                     <div className="flex items-start gap-2 p-2 rounded-md bg-muted/40 border border-muted">
@@ -1241,6 +1494,529 @@ export function Services() {
         onOpenChange={(open) => !open && setViewingService(null)}
       />
 
+      {/* ✅ Diálogo de edición compartido (fuera del map) */}
+      <Dialog
+        open={!!editingService}
+        onOpenChange={(open) => {
+          if (!open) {
+            setEditingService(null);
+            resetForm();
+          }
+        }}
+      >
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto custom-scrollbar">
+          <DialogHeader>
+            <DialogTitle>Editar Servicio</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <Tag className="h-4 w-4" />
+                Tipo de Servicio <span className="text-red-500">*</span>
+              </Label>
+              <div className="flex gap-2">
+                <Select
+                  value={formData.serviceType}
+                  onValueChange={(value) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      serviceType: value,
+                    }))
+                  }
+                >
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="Seleccionar tipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {serviceTypes.map((type) => (
+                      <SelectItem key={type.id} value={type.id}>
+                        {type.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setIsAddTypeDialogOpen(true)}
+                  className="hover:bg-primary hover:text-black transition-colors"
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="editServiceName">
+                Nombre del Servicio <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="editServiceName"
+                value={formData.name}
+                onChange={(e) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    name: e.target.value,
+                  }))
+                }
+                placeholder="Ej: Pilates"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label
+                htmlFor="editServiceDescription"
+                className="flex items-center gap-2"
+              >
+                <FileText className="h-4 w-4" />
+                Descripción (opcional)
+              </Label>
+              <Textarea
+                id="editServiceDescription"
+                value={formData.description}
+                onChange={(e) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    description: e.target.value,
+                  }))
+                }
+                placeholder="Describe los beneficios, requisitos o características del servicio..."
+                rows={3}
+                className="resize-none"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-start">
+              <div className="space-y-2">
+                <Label htmlFor="editServicePrice">
+                  Precio (Bs.) <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="editServicePrice"
+                  type="number"
+                  value={formData.price || ""}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      price: parseInt(e.target.value) || 0,
+                    }))
+                  }
+                  placeholder="0"
+                />
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="editServiceMaxEntries">
+                    Ingresos Permitidos <span className="text-red-500">*</span>
+                  </Label>
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="editUnlimited"
+                      checked={formData.unlimited}
+                      onCheckedChange={handleUnlimitedToggle}
+                      className="data-[state=checked]:bg-primary"
+                    />
+                    <Label
+                      htmlFor="editUnlimited"
+                      className="flex items-center text-sm cursor-pointer"
+                    >
+                      <Infinity className="h-3 w-3 mr-1" />
+                      Ilimitado
+                    </Label>
+                  </div>
+                </div>
+                <Input
+                  id="editServiceMaxEntries"
+                  type="number"
+                  value={
+                    formData.unlimited ? "" : formData.maxEntries || ""
+                  }
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      maxEntries: formData.unlimited
+                        ? null
+                        : parseInt(e.target.value) || 0,
+                    }))
+                  }
+                  placeholder={formData.unlimited ? "Ilimitado" : "0"}
+                  disabled={formData.unlimited}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="flex items-center">
+                <Calendar className="h-4 w-4 mr-2" />
+                Duración <span className="text-red-500">*</span>
+              </Label>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      tipoDuracion: "dias",
+                    }))
+                  }
+                  className={`flex-1 py-2 px-4 rounded-md border transition-all ${
+                    formData.tipoDuracion === "dias"
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-background border-input hover:bg-accent"
+                  }`}
+                >
+                  Días
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      tipoDuracion: "meses",
+                    }))
+                  }
+                  className={`flex-1 py-2 px-4 rounded-md border transition-all ${
+                    formData.tipoDuracion === "meses"
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-background border-input hover:bg-accent"
+                  }`}
+                >
+                  Meses
+                </button>
+              </div>
+              <div className="mt-2">
+                <Input
+                  id="editCantidadDuracion"
+                  type="number"
+                  value={formData.cantidadDuracion}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      cantidadDuracion:
+                        e.target.value === ""
+                          ? ""
+                          : parseInt(e.target.value) || 0,
+                    }))
+                  }
+                  placeholder={`Número de ${
+                    formData.tipoDuracion === "dias"
+                      ? "días"
+                      : formData.tipoDuracion === "meses"
+                      ? "meses"
+                      : "días/meses"
+                  }`}
+                />
+              </div>
+            </div>
+
+            <Separator />
+
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <Clock className="h-4 w-4" />
+                  <Label htmlFor="editHasTimeRange">Rango de horarios</Label>
+                </div>
+                <Switch
+                  id="editHasTimeRange"
+                  checked={formData.hasTimeRange}
+                  onCheckedChange={(checked) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      hasTimeRange: checked,
+                    }))
+                  }
+                />
+              </div>
+
+              {formData.hasTimeRange && (
+                <div className="grid grid-cols-2 gap-4 pl-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="editStartTime">Hora de inicio</Label>
+                    <TimePicker
+                      value={formData.startTime}
+                      onChange={(value) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          startTime: value,
+                        }))
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="editEndTime">Hora de fin</Label>
+                    <TimePicker
+                      value={formData.endTime}
+                      onChange={(value) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          endTime: value,
+                        }))
+                      }
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <Calendar className="h-4 w-4" />
+                  <Label htmlFor="editHasSpecificDays">Días específicos</Label>
+                </div>
+                <Switch
+                  id="editHasSpecificDays"
+                  checked={formData.hasSpecificDays}
+                  onCheckedChange={(checked) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      hasSpecificDays: checked,
+                    }))
+                  }
+                />
+              </div>
+
+              {formData.hasSpecificDays && (
+                <div className="pl-6">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 p-2 border rounded-md">
+                    {WEEKDAYS.map((day) => (
+                      <div
+                        key={day.id}
+                        className="flex items-center space-x-2"
+                      >
+                        <Checkbox
+                          id={`edit-day-${day.id}`}
+                          checked={formData.specificDays.includes(day.id)}
+                          onCheckedChange={() => {
+                            setFormData((prev) => ({
+                              ...prev,
+                              specificDays: prev.specificDays.includes(day.id)
+                                ? prev.specificDays.filter((d) => d !== day.id)
+                                : [...prev.specificDays, day.id],
+                            }));
+                          }}
+                        />
+                        <Label
+                          htmlFor={`edit-day-${day.id}`}
+                          className="text-sm cursor-pointer"
+                        >
+                          {day.name}
+                        </Label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <Users className="h-4 w-4" />
+                  <Label htmlFor="editRequiredPeopleEnabled">
+                    Personas requeridas
+                  </Label>
+                </div>
+                <Switch
+                  id="editRequiredPeopleEnabled"
+                  checked={formData.requiredPeopleEnabled}
+                  onCheckedChange={(checked) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      requiredPeopleEnabled: checked,
+                      requiredPeople: checked ? "1" : "",
+                    }))
+                  }
+                />
+              </div>
+
+              {!formData.requiredPeopleEnabled && (
+                <div className="pl-6">
+                  <div className="flex items-start gap-2 p-2 rounded-md bg-muted/40 border border-muted">
+                    <Info className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                    <p className="text-xs text-muted-foreground">
+                      Si no especificas personas requeridas, se tomará por
+                      defecto como{" "}
+                      <span className="font-semibold text-foreground">
+                        1 persona
+                      </span>
+                      .
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {formData.requiredPeopleEnabled && (
+                <div className="pl-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="editRequiredPeople">
+                      Cantidad de personas
+                    </Label>
+                    <Input
+                      id="editRequiredPeople"
+                      type="number"
+                      value={formData.requiredPeople}
+                      onChange={(e) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          requiredPeople:
+                            e.target.value === ""
+                              ? ""
+                              : parseInt(e.target.value) || 0,
+                        }))
+                      }
+                      min="0"
+                      placeholder="Número de personas"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      0 = no requiere personas específicas (ideal para
+                      inscripciones individuales)
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <Separator />
+
+            <div className="space-y-2">
+              <Label className="flex items-center">
+                <MapPin className="h-4 w-4 mr-2" />
+                Sucursales donde estará disponible el servicio{" "}
+                <span className="text-red-500">*</span>
+              </Label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-2 border rounded-md">
+                {sucursales.map((sucursal) => (
+                  <div
+                    key={sucursal.id}
+                    className="flex items-center space-x-2"
+                  >
+                    <Checkbox
+                      id={`edit-available-${sucursal.id}`}
+                      checked={formData.sucursales.includes(
+                        sucursal.id.toString()
+                      )}
+                      onCheckedChange={() =>
+                        handleSucursalSelection(
+                          sucursal.id.toString(),
+                          "available"
+                        )
+                      }
+                    />
+                    <Label
+                      htmlFor={`edit-available-${sucursal.id}`}
+                      className="text-sm cursor-pointer"
+                    >
+                      {sucursal.name}
+                    </Label>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-2 py-2">
+              <Switch
+                id="editMultisucursal"
+                checked={formData.multisucursal}
+                onCheckedChange={handleMultisucursalToggle}
+              />
+              <Label
+                htmlFor="editMultisucursal"
+                className="flex items-center cursor-pointer"
+              >
+                <Building2 className="h-4 w-4 mr-2" />
+                Servicio Multisucursal
+              </Label>
+            </div>
+
+            {formData.multisucursal && (
+              <div className="space-y-2">
+                <Label className="flex items-center text-primary">
+                  <Building2 className="h-4 w-4 mr-2" />
+                  Sucursales para acceso multisucursal (Mínimo 2){" "}
+                  <span className="text-red-500">*</span>
+                </Label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-2 border border-primary rounded-md bg-primary/5">
+                  {sucursales.map((sucursal) => (
+                    <div
+                      key={sucursal.id}
+                      className="flex items-center space-x-2"
+                    >
+                      <Checkbox
+                        id={`edit-multisucursal-${sucursal.id}`}
+                        checked={formData.sucursalesMultisucursal.includes(
+                          sucursal.id.toString()
+                        )}
+                        onCheckedChange={() =>
+                          handleSucursalSelection(
+                            sucursal.id.toString(),
+                            "multisucursal"
+                          )
+                        }
+                        disabled={
+                          !formData.sucursales.includes(
+                            sucursal.id.toString()
+                          )
+                        }
+                      />
+                      <Label
+                        htmlFor={`edit-multisucursal-${sucursal.id}`}
+                        className={`text-sm cursor-pointer ${
+                          !formData.sucursales.includes(
+                            sucursal.id.toString()
+                          )
+                            ? "text-muted-foreground"
+                            : ""
+                        }`}
+                      >
+                        {sucursal.name}
+                        {!formData.sucursales.includes(
+                          sucursal.id.toString()
+                        ) && " (No disponible)"}
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+                {formData.sucursalesMultisucursal.length < 2 && (
+                  <p className="text-sm text-red-500">
+                    Debe seleccionar al menos 2 sucursales para servicio
+                    multisucursal
+                  </p>
+                )}
+              </div>
+            )}
+
+            <div className="flex flex-col sm:flex-row gap-2 pt-4">
+              <Button
+                onClick={handleEditService}
+                className="flex-1"
+                disabled={
+                  !!validateForm() ||
+                  (editingService &&
+                    isButtonLoading(`edit-service-${editingService.id}`))
+                }
+              >
+                {editingService &&
+                isButtonLoading(`edit-service-${editingService.id}`)
+                  ? "Guardando..."
+                  : "Guardar Cambios"}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setEditingService(null);
+                  resetForm();
+                }}
+                disabled={
+                  editingService &&
+                  isButtonLoading(`edit-service-${editingService.id}`)
+                }
+              >
+                Cancelar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <Card className="gym-card">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -1249,863 +2025,329 @@ export function Services() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="rounded-md border overflow-x-auto">
-            <table className="w-full caption-bottom text-sm">
-              <thead className="[&_tr]:border-b">
-                <tr className="border-b transition-colors hover:bg-muted/50">
-                  <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">
-                    Servicio
-                  </th>
-                  <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground hidden sm:table-cell">
-                    Tipo
-                  </th>
-                  <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground hidden sm:table-cell">
-                    Precio
-                  </th>
-                  <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground hidden md:table-cell">
-                    Ingresos
-                  </th>
-                  <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground hidden lg:table-cell">
-                    Duración
-                  </th>
-                  <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground hidden lg:table-cell">
-                    Sucursales
-                  </th>
-                  <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">
-                    Estado
-                  </th>
-                  <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">
-                    Acciones
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="[&_tr:last-child]:border-0">
-                {services.map((service) => (
-                  <tr
-                    key={service.id}
-                    className="border-b transition-colors hover:bg-muted/50"
-                  >
-                    <td className="p-4 align-middle">
-                      <div className="font-medium">{service.name}</div>
-                      <div className="text-sm text-muted-foreground sm:hidden">
-                        {service.price} Bs. •{" "}
-                        {service.maxEntries === null
-                          ? "Ilimitado"
-                          : `${service.maxEntries} ingresos`}
-                      </div>
-                      <div className="text-sm text-muted-foreground sm:hidden">
-                        Tipo: {getServiceTypeName(service.serviceType)}
-                      </div>
-                      {service.requiredPeopleEnabled &&
-                        service.requiredPeople !== undefined &&
-                        service.requiredPeople !== null && (
-                          <div className="text-sm text-muted-foreground sm:hidden">
-                            {service.requiredPeople === 0
-                              ? "No requiere personas"
-                              : `${service.requiredPeople} personas`}
+          {isMobile ? (
+            /* ✅ MÓVIL: cards apiladas */
+            <div className="space-y-3">
+              {services.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Dumbbell size={48} className="mx-auto mb-4 opacity-50" />
+                  <p>No hay servicios registrados</p>
+                </div>
+              ) : (
+                services.map((service) => (
+                  <ServiceCard key={service.id} service={service} />
+                ))
+              )}
+            </div>
+          ) : (
+            /* DESKTOP: tabla */
+            <div className="rounded-md border overflow-x-auto">
+              <table className="w-full caption-bottom text-sm">
+                <thead className="[&_tr]:border-b">
+                  <tr className="border-b transition-colors hover:bg-muted/50">
+                    <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">
+                      Servicio
+                    </th>
+                    <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground hidden sm:table-cell">
+                      Tipo
+                    </th>
+                    <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground hidden sm:table-cell">
+                      Precio
+                    </th>
+                    <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground hidden md:table-cell">
+                      Ingresos
+                    </th>
+                    <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground hidden lg:table-cell">
+                      Duración
+                    </th>
+                    <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground hidden lg:table-cell">
+                      Sucursales
+                    </th>
+                    <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">
+                      Estado
+                    </th>
+                    <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">
+                      Acciones
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="[&_tr:last-child]:border-0">
+                  {services.map((service) => (
+                    <tr
+                      key={service.id}
+                      className="border-b transition-colors hover:bg-muted/50"
+                    >
+                      <td className="p-4 align-middle">
+                        <div className="font-medium">{service.name}</div>
+                        <div className="text-sm text-muted-foreground sm:hidden">
+                          {service.price} Bs. •{" "}
+                          {service.maxEntries === null
+                            ? "Ilimitado"
+                            : `${service.maxEntries} ingresos`}
+                        </div>
+                        <div className="text-sm text-muted-foreground sm:hidden">
+                          Tipo: {getServiceTypeName(service.serviceType)}
+                        </div>
+                        {service.requiredPeopleEnabled &&
+                          service.requiredPeople !== undefined &&
+                          service.requiredPeople !== null && (
+                            <div className="text-sm text-muted-foreground sm:hidden">
+                              {service.requiredPeople === 0
+                                ? "No requiere personas"
+                                : `${service.requiredPeople} personas`}
+                            </div>
+                          )}
+                        <div className="mt-1 flex flex-wrap gap-1 sm:hidden">
+                          {service.sucursales.slice(0, 2).map((sucursalId) => {
+                            const sucursal = sucursales.find(
+                              (s) => s.id.toString() === sucursalId
+                            );
+                            return (
+                              <Badge
+                                key={sucursalId}
+                                variant="outline"
+                                className="text-xs"
+                              >
+                                {sucursal?.name || sucursalId}
+                              </Badge>
+                            );
+                          })}
+                          {service.sucursales.length > 2 && (
+                            <Badge variant="outline" className="text-xs">
+                              +{service.sucursales.length - 2}
+                            </Badge>
+                          )}
+                        </div>
+                        {service.multisucursal && (
+                          <div className="mt-1 sm:hidden">
+                            <Badge variant="secondary" className="text-xs">
+                              <Building2 className="h-3 w-3 mr-1" />
+                              Multisucursal
+                            </Badge>
                           </div>
                         )}
-                      <div className="mt-1 flex flex-wrap gap-1 sm:hidden">
-                        {service.sucursales.slice(0, 2).map((sucursalId) => {
-                          const sucursal = sucursales.find(
-                            (s) => s.id.toString() === sucursalId
-                          );
-                          return (
-                            <Badge
-                              key={sucursalId}
-                              variant="outline"
-                              className="text-xs"
-                            >
-                              {sucursal?.name || sucursalId}
-                            </Badge>
-                          );
-                        })}
-                        {service.sucursales.length > 2 && (
-                          <Badge variant="outline" className="text-xs">
-                            +{service.sucursales.length - 2}
-                          </Badge>
+                        {service.description && (
+                          <div className="mt-1 sm:hidden text-xs text-muted-foreground line-clamp-1">
+                            {service.description}
+                          </div>
                         )}
-                      </div>
-                      {service.multisucursal && (
-                        <div className="mt-1 sm:hidden">
-                          <Badge variant="secondary" className="text-xs">
-                            <Building2 className="h-3 w-3 mr-1" />
-                            Multisucursal
-                          </Badge>
+                      </td>
+                      <td className="p-4 align-middle hidden sm:table-cell">
+                        <Badge variant="outline">
+                          {getServiceTypeName(service.serviceType)}
+                        </Badge>
+                      </td>
+                      <td className="p-4 align-middle hidden sm:table-cell">
+                        <div className="font-bold text-primary">
+                          {service.price} Bs.
                         </div>
-                      )}
-                      {service.description && (
-                        <div className="mt-1 sm:hidden text-xs text-muted-foreground line-clamp-1">
-                          {service.description}
-                        </div>
-                      )}
-                    </td>
-                    <td className="p-4 align-middle hidden sm:table-cell">
-                      <Badge variant="outline">
-                        {getServiceTypeName(service.serviceType)}
-                      </Badge>
-                    </td>
-                    <td className="p-4 align-middle hidden sm:table-cell">
-                      <div className="font-bold text-primary">
-                        {service.price} Bs.
-                      </div>
-                    </td>
-                    <td className="p-4 align-middle hidden md:table-cell">
-                      <Badge
-                        variant="outline"
-                        className={
-                          service.maxEntries === null
-                            ? "bg-green-100 text-green-800"
-                            : ""
-                        }
-                      >
-                        {service.maxEntries === null ? (
-                          <span className="flex items-center">
-                            <Infinity className="h-3 w-3 mr-1" />
-                            Ilimitado
-                          </span>
-                        ) : (
-                          `${service.maxEntries} ingresos`
-                        )}
-                      </Badge>
-                    </td>
-                    <td className="p-4 align-middle hidden lg:table-cell">
-                      <Badge variant="secondary">
-                        <Calendar className="h-3 w-3 mr-1" />
-                        {service.cantidadDuracion} {service.tipoDuracion}
-                      </Badge>
-                    </td>
-                    <td className="p-4 align-middle hidden lg:table-cell">
-                      <div className="flex flex-wrap gap-1">
-                        {service.sucursales.slice(0, 2).map((sucursalId) => {
-                          const sucursal = sucursales.find(
-                            (s) => s.id.toString() === sucursalId
-                          );
-                          return (
-                            <Badge
-                              key={sucursalId}
-                              variant="outline"
-                              className="text-xs"
-                            >
-                              {sucursal?.name || sucursalId}
-                            </Badge>
-                          );
-                        })}
-                        {service.sucursales.length > 2 && (
-                          <Badge variant="outline" className="text-xs">
-                            +{service.sucursales.length - 2}
-                          </Badge>
-                        )}
-                      </div>
-                      {service.multisucursal && (
-                        <div className="text-xs text-muted-foreground mt-1">
-                          <Building2 className="h-3 w-3 inline mr-1" />
-                          Multisucursal
-                        </div>
-                      )}
-                    </td>
-                    <td className="p-4 align-middle">
-                      <div className="flex items-center gap-2">
-                        <AlertDialog
-                          open={
-                            statusChangeDialog.open &&
-                            statusChangeDialog.service?.id === service.id
-                          }
-                          onOpenChange={(open) =>
-                            setStatusChangeDialog(
-                              open
-                                ? { open, service }
-                                : { open: false, service: null }
-                            )
-                          }
-                        >
-                          <AlertDialogTrigger asChild>
-                            <div>
-                              <Switch
-                                checked={service.isActive}
-                                onCheckedChange={() =>
-                                  setStatusChangeDialog({ open: true, service })
-                                }
-                                disabled={isButtonLoading(
-                                  `toggle-status-${service.id}`
-                                )}
-                              />
-                            </div>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>
-                                {service.isActive
-                                  ? "Desactivar servicio"
-                                  : "Activar servicio"}
-                              </AlertDialogTitle>
-                              <AlertDialogDescription>
-                                ¿Estás seguro de que deseas{" "}
-                                {service.isActive ? "desactivar" : "activar"} el
-                                servicio "{service.name}"?
-                                {service.isActive &&
-                                  " Los usuarios no podrán adquirir este servicio mientras esté desactivado."}
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel
-                                disabled={isButtonLoading(
-                                  `toggle-status-${service.id}`
-                                )}
-                              >
-                                Cancelar
-                              </AlertDialogCancel>
-                              <AlertDialogAction
-                                onClick={() => handleToggleStatus(service.id)}
-                                disabled={isButtonLoading(
-                                  `toggle-status-${service.id}`
-                                )}
-                              >
-                                {isButtonLoading(`toggle-status-${service.id}`)
-                                  ? "Procesando..."
-                                  : service.isActive
-                                  ? "Desactivar"
-                                  : "Activar"}
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                        <span className="text-sm sm:hidden">
-                          {service.isActive ? "Activo" : "Inactivo"}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="p-4 align-middle">
-                      <div className="flex gap-2">
-                        <Button
+                      </td>
+                      <td className="p-4 align-middle hidden md:table-cell">
+                        <Badge
                           variant="outline"
-                          size="sm"
-                          className="h-8 w-8 p-0"
-                          onClick={() => setViewingService(service)}
+                          className={
+                            service.maxEntries === null
+                              ? "bg-green-100 text-green-800"
+                              : ""
+                          }
                         >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-
-                        <Dialog
-                          open={editingService?.id === service.id}
-                          onOpenChange={(open) => {
-                            if (!open) {
-                              setEditingService(null);
-                              resetForm();
+                          {service.maxEntries === null ? (
+                            <span className="flex items-center">
+                              <Infinity className="h-3 w-3 mr-1" />
+                              Ilimitado
+                            </span>
+                          ) : (
+                            `${service.maxEntries} ingresos`
+                          )}
+                        </Badge>
+                      </td>
+                      <td className="p-4 align-middle hidden lg:table-cell">
+                        <Badge variant="secondary">
+                          <Calendar className="h-3 w-3 mr-1" />
+                          {service.cantidadDuracion} {service.tipoDuracion}
+                        </Badge>
+                      </td>
+                      <td className="p-4 align-middle hidden lg:table-cell">
+                        <div className="flex flex-wrap gap-1">
+                          {service.sucursales.slice(0, 2).map((sucursalId) => {
+                            const sucursal = sucursales.find(
+                              (s) => s.id.toString() === sucursalId
+                            );
+                            return (
+                              <Badge
+                                key={sucursalId}
+                                variant="outline"
+                                className="text-xs"
+                              >
+                                {sucursal?.name || sucursalId}
+                              </Badge>
+                            );
+                          })}
+                          {service.sucursales.length > 2 && (
+                            <Badge variant="outline" className="text-xs">
+                              +{service.sucursales.length - 2}
+                            </Badge>
+                          )}
+                        </div>
+                        {service.multisucursal && (
+                          <div className="text-xs text-muted-foreground mt-1">
+                            <Building2 className="h-3 w-3 inline mr-1" />
+                            Multisucursal
+                          </div>
+                        )}
+                      </td>
+                      <td className="p-4 align-middle">
+                        <div className="flex items-center gap-2">
+                          <AlertDialog
+                            open={
+                              statusChangeDialog.open &&
+                              statusChangeDialog.service?.id === service.id
                             }
-                          }}
-                        >
-                          <DialogTrigger asChild>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => startEdit(service)}
-                              className="h-8 w-8 p-0"
-                              disabled={isButtonLoading(
-                                `edit-service-${service.id}`
-                              )}
-                            >
-                              <Edit3 className="h-4 w-4" />
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto custom-scrollbar">
-                            <DialogHeader>
-                              <DialogTitle>Editar Servicio</DialogTitle>
-                            </DialogHeader>
-                            <div className="space-y-4">
-                              <div className="space-y-2">
-                                <Label className="flex items-center gap-2">
-                                  <Tag className="h-4 w-4" />
-                                  Tipo de Servicio{" "}
-                                  <span className="text-red-500">*</span>
-                                </Label>
-                                <div className="flex gap-2">
-                                  <Select
-                                    value={formData.serviceType}
-                                    onValueChange={(value) =>
-                                      setFormData((prev) => ({
-                                        ...prev,
-                                        serviceType: value,
-                                      }))
-                                    }
-                                  >
-                                    <SelectTrigger className="flex-1">
-                                      <SelectValue placeholder="Seleccionar tipo" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {serviceTypes.map((type) => (
-                                        <SelectItem key={type.id} value={type.id}>
-                                          {type.name}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="icon"
-                                    onClick={() => setIsAddTypeDialogOpen(true)}
-                                    className="hover:bg-primary hover:text-black transition-colors"
-                                  >
-                                    <Plus className="h-4 w-4" />
-                                  </Button>
-                                </div>
-                              </div>
-
-                              <div className="space-y-2">
-                                <Label htmlFor="editServiceName">
-                                  Nombre del Servicio{" "}
-                                  <span className="text-red-500">*</span>
-                                </Label>
-                                <Input
-                                  id="editServiceName"
-                                  value={formData.name}
-                                  onChange={(e) =>
-                                    setFormData((prev) => ({
-                                      ...prev,
-                                      name: e.target.value,
-                                    }))
-                                  }
-                                  placeholder="Ej: Pilates"
-                                />
-                              </div>
-
-                              <div className="space-y-2">
-                                <Label
-                                  htmlFor="editServiceDescription"
-                                  className="flex items-center gap-2"
-                                >
-                                  <FileText className="h-4 w-4" />
-                                  Descripción (opcional)
-                                </Label>
-                                <Textarea
-                                  id="editServiceDescription"
-                                  value={formData.description}
-                                  onChange={(e) =>
-                                    setFormData((prev) => ({
-                                      ...prev,
-                                      description: e.target.value,
-                                    }))
-                                  }
-                                  placeholder="Describe los beneficios, requisitos o características del servicio..."
-                                  rows={3}
-                                  className="resize-none"
-                                />
-                              </div>
-
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-start">
-                                <div className="space-y-2">
-                                  <Label htmlFor="editServicePrice">
-                                    Precio (Bs.){" "}
-                                    <span className="text-red-500">*</span>
-                                  </Label>
-                                  <Input
-                                    id="editServicePrice"
-                                    type="number"
-                                    value={formData.price || ""}
-                                    onChange={(e) =>
-                                      setFormData((prev) => ({
-                                        ...prev,
-                                        price: parseInt(e.target.value) || 0,
-                                      }))
-                                    }
-                                    placeholder="0"
-                                  />
-                                </div>
-                                <div className="space-y-2">
-                                  <div className="flex items-center justify-between">
-                                    <Label htmlFor="editServiceMaxEntries">
-                                      Ingresos Permitidos{" "}
-                                      <span className="text-red-500">*</span>
-                                    </Label>
-                                    <div className="flex items-center space-x-2">
-                                      <Switch
-                                        id="editUnlimited"
-                                        checked={formData.unlimited}
-                                        onCheckedChange={handleUnlimitedToggle}
-                                        className="data-[state=checked]:bg-primary"
-                                      />
-                                      <Label
-                                        htmlFor="editUnlimited"
-                                        className="flex items-center text-sm cursor-pointer"
-                                      >
-                                        <Infinity className="h-3 w-3 mr-1" />
-                                        Ilimitado
-                                      </Label>
-                                    </div>
-                                  </div>
-                                  <Input
-                                    id="editServiceMaxEntries"
-                                    type="number"
-                                    value={
-                                      formData.unlimited
-                                        ? ""
-                                        : formData.maxEntries || ""
-                                    }
-                                    onChange={(e) =>
-                                      setFormData((prev) => ({
-                                        ...prev,
-                                        maxEntries: formData.unlimited
-                                          ? null
-                                          : parseInt(e.target.value) || 0,
-                                      }))
-                                    }
-                                    placeholder={
-                                      formData.unlimited ? "Ilimitado" : "0"
-                                    }
-                                    disabled={formData.unlimited}
-                                  />
-                                </div>
-                              </div>
-
-                              <div className="space-y-2">
-                                <Label className="flex items-center">
-                                  <Calendar className="h-4 w-4 mr-2" />
-                                  Duración{" "}
-                                  <span className="text-red-500">*</span>
-                                </Label>
-                                <div className="flex gap-3">
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      setFormData((prev) => ({
-                                        ...prev,
-                                        tipoDuracion: "dias",
-                                      }))
-                                    }
-                                    className={`flex-1 py-2 px-4 rounded-md border transition-all ${
-                                      formData.tipoDuracion === "dias"
-                                        ? "bg-primary text-primary-foreground border-primary"
-                                        : "bg-background border-input hover:bg-accent"
-                                    }`}
-                                  >
-                                    Días
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      setFormData((prev) => ({
-                                        ...prev,
-                                        tipoDuracion: "meses",
-                                      }))
-                                    }
-                                    className={`flex-1 py-2 px-4 rounded-md border transition-all ${
-                                      formData.tipoDuracion === "meses"
-                                        ? "bg-primary text-primary-foreground border-primary"
-                                        : "bg-background border-input hover:bg-accent"
-                                    }`}
-                                  >
-                                    Meses
-                                  </button>
-                                </div>
-                                <div className="mt-2">
-                                  <Input
-                                    id="editCantidadDuracion"
-                                    type="number"
-                                    value={formData.cantidadDuracion}
-                                    onChange={(e) =>
-                                      setFormData((prev) => ({
-                                        ...prev,
-                                        cantidadDuracion:
-                                          e.target.value === ""
-                                            ? ""
-                                            : parseInt(e.target.value) || 0,
-                                      }))
-                                    }
-                                    placeholder={`Número de ${
-                                      formData.tipoDuracion === "dias"
-                                        ? "días"
-                                        : formData.tipoDuracion === "meses"
-                                        ? "meses"
-                                        : "días/meses"
-                                    }`}
-                                  />
-                                </div>
-                              </div>
-
-                              <Separator />
-
-                              <div className="space-y-4">
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center space-x-2">
-                                    <Clock className="h-4 w-4" />
-                                    <Label htmlFor="editHasTimeRange">
-                                      Rango de horarios
-                                    </Label>
-                                  </div>
-                                  <Switch
-                                    id="editHasTimeRange"
-                                    checked={formData.hasTimeRange}
-                                    onCheckedChange={(checked) =>
-                                      setFormData((prev) => ({
-                                        ...prev,
-                                        hasTimeRange: checked,
-                                      }))
-                                    }
-                                  />
-                                </div>
-
-                                {formData.hasTimeRange && (
-                                  <div className="grid grid-cols-2 gap-4 pl-6">
-                                    <div className="space-y-2">
-                                      <Label htmlFor="editStartTime">
-                                        Hora de inicio
-                                      </Label>
-                                      <TimePicker
-                                        value={formData.startTime}
-                                        onChange={(value) =>
-                                          setFormData((prev) => ({
-                                            ...prev,
-                                            startTime: value,
-                                          }))
-                                        }
-                                      />
-                                    </div>
-                                    <div className="space-y-2">
-                                      <Label htmlFor="editEndTime">
-                                        Hora de fin
-                                      </Label>
-                                      <TimePicker
-                                        value={formData.endTime}
-                                        onChange={(value) =>
-                                          setFormData((prev) => ({
-                                            ...prev,
-                                            endTime: value,
-                                          }))
-                                        }
-                                      />
-                                    </div>
-                                  </div>
-                                )}
-
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center space-x-2">
-                                    <Calendar className="h-4 w-4" />
-                                    <Label htmlFor="editHasSpecificDays">
-                                      Días específicos
-                                    </Label>
-                                  </div>
-                                  <Switch
-                                    id="editHasSpecificDays"
-                                    checked={formData.hasSpecificDays}
-                                    onCheckedChange={(checked) =>
-                                      setFormData((prev) => ({
-                                        ...prev,
-                                        hasSpecificDays: checked,
-                                      }))
-                                    }
-                                  />
-                                </div>
-
-                                {formData.hasSpecificDays && (
-                                  <div className="pl-6">
-                                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 p-2 border rounded-md">
-                                      {WEEKDAYS.map((day) => (
-                                        <div
-                                          key={day.id}
-                                          className="flex items-center space-x-2"
-                                        >
-                                          <Checkbox
-                                            id={`edit-day-${day.id}`}
-                                            checked={formData.specificDays.includes(
-                                              day.id
-                                            )}
-                                            onCheckedChange={() => {
-                                              setFormData((prev) => ({
-                                                ...prev,
-                                                specificDays:
-                                                  prev.specificDays.includes(
-                                                    day.id
-                                                  )
-                                                    ? prev.specificDays.filter(
-                                                        (d) => d !== day.id
-                                                      )
-                                                    : [
-                                                        ...prev.specificDays,
-                                                        day.id,
-                                                      ],
-                                              }));
-                                            }}
-                                          />
-                                          <Label
-                                            htmlFor={`edit-day-${day.id}`}
-                                            className="text-sm cursor-pointer"
-                                          >
-                                            {day.name}
-                                          </Label>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  </div>
-                                )}
-
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center space-x-2">
-                                    <Users className="h-4 w-4" />
-                                    <Label htmlFor="editRequiredPeopleEnabled">
-                                      Personas requeridas
-                                    </Label>
-                                  </div>
-                                  <Switch
-                                    id="editRequiredPeopleEnabled"
-                                    checked={formData.requiredPeopleEnabled}
-                                    onCheckedChange={(checked) =>
-                                      setFormData((prev) => ({
-                                        ...prev,
-                                        requiredPeopleEnabled: checked,
-                                        requiredPeople: checked ? "1" : "",
-                                      }))
-                                    }
-                                  />
-                                </div>
-
-                                {/* ✅ CAMBIO: aviso también en edición */}
-                                {!formData.requiredPeopleEnabled && (
-                                  <div className="pl-6">
-                                    <div className="flex items-start gap-2 p-2 rounded-md bg-muted/40 border border-muted">
-                                      <Info className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
-                                      <p className="text-xs text-muted-foreground">
-                                        Si no especificas personas requeridas,
-                                        se tomará por defecto como{" "}
-                                        <span className="font-semibold text-foreground">
-                                          1 persona
-                                        </span>
-                                        .
-                                      </p>
-                                    </div>
-                                  </div>
-                                )}
-
-                                {formData.requiredPeopleEnabled && (
-                                  <div className="pl-6">
-                                    <div className="space-y-2">
-                                      <Label htmlFor="editRequiredPeople">
-                                        Cantidad de personas
-                                      </Label>
-                                      <Input
-                                        id="editRequiredPeople"
-                                        type="number"
-                                        value={formData.requiredPeople}
-                                        onChange={(e) =>
-                                          setFormData((prev) => ({
-                                            ...prev,
-                                            requiredPeople:
-                                              e.target.value === ""
-                                                ? ""
-                                                : parseInt(e.target.value) || 0,
-                                          }))
-                                        }
-                                        min="0"
-                                        placeholder="Número de personas"
-                                      />
-                                      <p className="text-xs text-muted-foreground">
-                                        0 = no requiere personas específicas
-                                        (ideal para inscripciones individuales)
-                                      </p>
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-
-                              <Separator />
-
-                              <div className="space-y-2">
-                                <Label className="flex items-center">
-                                  <MapPin className="h-4 w-4 mr-2" />
-                                  Sucursales donde estará disponible el
-                                  servicio <span className="text-red-500">*</span>
-                                </Label>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-2 border rounded-md">
-                                  {sucursales.map((sucursal) => (
-                                    <div
-                                      key={sucursal.id}
-                                      className="flex items-center space-x-2"
-                                    >
-                                      <Checkbox
-                                        id={`edit-available-${sucursal.id}`}
-                                        checked={formData.sucursales.includes(
-                                          sucursal.id.toString()
-                                        )}
-                                        onCheckedChange={() =>
-                                          handleSucursalSelection(
-                                            sucursal.id.toString(),
-                                            "available"
-                                          )
-                                        }
-                                      />
-                                      <Label
-                                        htmlFor={`edit-available-${sucursal.id}`}
-                                        className="text-sm cursor-pointer"
-                                      >
-                                        {sucursal.name}
-                                      </Label>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-
-                              <div className="flex items-center space-x-2 py-2">
+                            onOpenChange={(open) =>
+                              setStatusChangeDialog(
+                                open
+                                  ? { open, service }
+                                  : { open: false, service: null }
+                              )
+                            }
+                          >
+                            <AlertDialogTrigger asChild>
+                              <div>
                                 <Switch
-                                  id="editMultisucursal"
-                                  checked={formData.multisucursal}
-                                  onCheckedChange={handleMultisucursalToggle}
-                                />
-                                <Label
-                                  htmlFor="editMultisucursal"
-                                  className="flex items-center cursor-pointer"
-                                >
-                                  <Building2 className="h-4 w-4 mr-2" />
-                                  Servicio Multisucursal
-                                </Label>
-                              </div>
-
-                              {formData.multisucursal && (
-                                <div className="space-y-2">
-                                  <Label className="flex items-center text-primary">
-                                    <Building2 className="h-4 w-4 mr-2" />
-                                    Sucursales para acceso multisucursal (Mínimo
-                                    2) <span className="text-red-500">*</span>
-                                  </Label>
-                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-2 border border-primary rounded-md bg-primary/5">
-                                    {sucursales.map((sucursal) => (
-                                      <div
-                                        key={sucursal.id}
-                                        className="flex items-center space-x-2"
-                                      >
-                                        <Checkbox
-                                          id={`edit-multisucursal-${sucursal.id}`}
-                                          checked={formData.sucursalesMultisucursal.includes(
-                                            sucursal.id.toString()
-                                          )}
-                                          onCheckedChange={() =>
-                                            handleSucursalSelection(
-                                              sucursal.id.toString(),
-                                              "multisucursal"
-                                            )
-                                          }
-                                          disabled={
-                                            !formData.sucursales.includes(
-                                              sucursal.id.toString()
-                                            )
-                                          }
-                                        />
-                                        <Label
-                                          htmlFor={`edit-multisucursal-${sucursal.id}`}
-                                          className={`text-sm cursor-pointer ${
-                                            !formData.sucursales.includes(
-                                              sucursal.id.toString()
-                                            )
-                                              ? "text-muted-foreground"
-                                              : ""
-                                          }`}
-                                        >
-                                          {sucursal.name}
-                                          {!formData.sucursales.includes(
-                                            sucursal.id.toString()
-                                          ) && " (No disponible)"}
-                                        </Label>
-                                      </div>
-                                    ))}
-                                  </div>
-                                  {formData.sucursalesMultisucursal.length <
-                                    2 && (
-                                    <p className="text-sm text-red-500">
-                                      Debe seleccionar al menos 2 sucursales
-                                      para servicio multisucursal
-                                    </p>
-                                  )}
-                                </div>
-                              )}
-
-                              <div className="flex flex-col sm:flex-row gap-2 pt-4">
-                                <Button
-                                  onClick={handleEditService}
-                                  className="flex-1"
-                                  disabled={
-                                    !!validateForm() ||
-                                    isButtonLoading(
-                                      `edit-service-${service.id}`
-                                    )
+                                  checked={service.isActive}
+                                  onCheckedChange={() =>
+                                    setStatusChangeDialog({ open: true, service })
                                   }
-                                >
-                                  {isButtonLoading(
-                                    `edit-service-${service.id}`
-                                  )
-                                    ? "Guardando..."
-                                    : "Guardar Cambios"}
-                                </Button>
-                                <Button
-                                  variant="outline"
-                                  onClick={() => {
-                                    setEditingService(null);
-                                    resetForm();
-                                  }}
                                   disabled={isButtonLoading(
-                                    `edit-service-${service.id}`
+                                    `toggle-status-${service.id}`
+                                  )}
+                                />
+                              </div>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>
+                                  {service.isActive
+                                    ? "Desactivar servicio"
+                                    : "Activar servicio"}
+                                </AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  ¿Estás seguro de que deseas{" "}
+                                  {service.isActive ? "desactivar" : "activar"} el
+                                  servicio "{service.name}"?
+                                  {service.isActive &&
+                                    " Los usuarios no podrán adquirir este servicio mientras esté desactivado."}
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel
+                                  disabled={isButtonLoading(
+                                    `toggle-status-${service.id}`
                                   )}
                                 >
                                   Cancelar
-                                </Button>
-                              </div>
-                            </div>
-                          </DialogContent>
-                        </Dialog>
+                                </AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => handleToggleStatus(service.id)}
+                                  disabled={isButtonLoading(
+                                    `toggle-status-${service.id}`
+                                  )}
+                                >
+                                  {isButtonLoading(`toggle-status-${service.id}`)
+                                    ? "Procesando..."
+                                    : service.isActive
+                                    ? "Desactivar"
+                                    : "Activar"}
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                          <span className="text-sm sm:hidden">
+                            {service.isActive ? "Activo" : "Inactivo"}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="p-4 align-middle">
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 w-8 p-0"
+                            onClick={() => setViewingService(service)}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
 
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button
-                              variant="destructive"
-                              size="sm"
-                              className="h-8 w-8 p-0"
-                              disabled={isButtonLoading(
-                                `delete-service-${service.id}`
-                              )}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>
-                                Eliminar servicio
-                              </AlertDialogTitle>
-                              <AlertDialogDescription>
-                                ¿Estás seguro de que deseas eliminar{" "}
-                                {service.name}? Esta acción no se puede
-                                deshacer.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => startEdit(service)}
+                            className="h-8 w-8 p-0"
+                            disabled={isButtonLoading(
+                              `edit-service-${service.id}`
+                            )}
+                          >
+                            <Edit3 className="h-4 w-4" />
+                          </Button>
+
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                className="h-8 w-8 p-0"
                                 disabled={isButtonLoading(
                                   `delete-service-${service.id}`
                                 )}
                               >
-                                Cancelar
-                              </AlertDialogCancel>
-                              <AlertDialogAction
-                                onClick={() => handleDeleteService(service.id)}
-                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                disabled={isButtonLoading(
-                                  `delete-service-${service.id}`
-                                )}
-                              >
-                                {isButtonLoading(`delete-service-${service.id}`)
-                                  ? "Eliminando..."
-                                  : "Eliminar"}
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>
+                                  Eliminar servicio
+                                </AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  ¿Estás seguro de que deseas eliminar{" "}
+                                  {service.name}? Esta acción no se puede
+                                  deshacer.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel
+                                  disabled={isButtonLoading(
+                                    `delete-service-${service.id}`
+                                  )}
+                                >
+                                  Cancelar
+                                </AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => handleDeleteService(service.id)}
+                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                  disabled={isButtonLoading(
+                                    `delete-service-${service.id}`
+                                  )}
+                                >
+                                  {isButtonLoading(
+                                    `delete-service-${service.id}`
+                                  )
+                                    ? "Eliminando..."
+                                    : "Eliminar"}
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
 
-          {services.length === 0 && (
+          {services.length === 0 && !isMobile && (
             <div className="text-center py-8 text-muted-foreground">
               <Dumbbell size={48} className="mx-auto mb-4 opacity-50" />
               <p>No hay servicios registrados</p>
