@@ -504,10 +504,15 @@ export const createPersonQuick = async (data: {
     return response.data;
   } catch (error: any) {
     console.error("Error creating person:", error);
-    if (error.response?.data?.message) {
-      throw new Error(error.response.data.message);
+    
+    // Extraemos el mensaje exacto del backend
+    const backendMessage = error.response?.data?.message || error.response?.data?.error;
+    
+    if (backendMessage) {
+      throw new Error(backendMessage);
     }
-    throw new Error("No se pudo crear la persona");
+    
+    throw new Error(error.message || "No se pudo crear la persona");
   }
 };
 
