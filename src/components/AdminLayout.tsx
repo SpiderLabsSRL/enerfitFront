@@ -34,6 +34,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Award,
+  Bell,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -109,6 +110,13 @@ const mainSidebarItems: SidebarItem[] = [
     path: "/admin/reports",
     roles: ["admin"],
   },
+  // ✅ NUEVO: Recordatorios en el menú principal del admin
+  {
+    title: "Recordatorios",
+    icon: Bell,
+    path: "/admin/reminders",
+    roles: ["admin"],
+  },
 ];
 
 const reportsSubmenuItems: SidebarItem[] = [
@@ -130,6 +138,7 @@ const reportsSubmenuItems: SidebarItem[] = [
     path: "/admin/reporte-empleados",
     roles: ["admin"],
   },
+  // ❌ ELIMINADO de aquí: "Recordatorios" (ahora está en el menú principal)
 ];
 
 const additionalSidebarItems: SidebarItem[] = [

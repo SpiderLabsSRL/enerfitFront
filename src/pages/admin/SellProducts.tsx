@@ -1,5 +1,5 @@
 // src/pages/admin/SellProducts.tsx
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react"; // 🔒 +useRef
 import {
   Card,
   CardContent,
@@ -60,9 +60,7 @@ interface ExtendedProduct extends Product {
 }
 
 interface SellProductsProps {
-  /** Modo compacto tipo chat (para el botón flotante) */
   compact?: boolean;
-  /** Callback al completar una venta (usado por el panel flotante para cerrarse) */
   onSaleSuccess?: () => void;
 }
 
@@ -84,10 +82,7 @@ export function SellProducts({ compact = false, onSaleSuccess }: SellProductsPro
   const [cart, setCart] = useState<CartItem[]>([]);
   const [discount, setDiscount] = useState(0);
   const [discountReason, setDiscountReason] = useState("");
-
-  // ✅ CAMBIO: sin método de pago por defecto
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null);
-
   const [showDiscountField, setShowDiscountField] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [isLoading, setIsLoading] = useState(true);
@@ -99,7 +94,12 @@ export function SellProducts({ compact = false, onSaleSuccess }: SellProductsPro
   const [showScanner, setShowScanner] = useState(false);
   const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
 
-  // Cupones
+  // 🔒 Candado síncrono: bloquea doble submit ANTES del re-render de React
+  const processingRef = useRef(false);
+
+  // 🔒 Diálogo de confirmación controlado
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
   const [couponCode, setCouponCode] = useState("");
   const [appliedCoupon, setAppliedCoupon] = useState<ValidatedCoupon | null>(
     null
@@ -127,9 +127,6 @@ export function SellProducts({ compact = false, onSaleSuccess }: SellProductsPro
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ============================================
-  // CARGA DE DATOS
-  // ============================================
   const loadCashRegisterStatus = async (userData: UserData) => {
     try {
       const status = await getCashRegisterStatus(userData.idusuario);
@@ -162,9 +159,6 @@ export function SellProducts({ compact = false, onSaleSuccess }: SellProductsPro
     }
   };
 
-  // ============================================
-  // FILTRADO
-  // ============================================
   const filteredProducts = products.filter(
     (product) =>
       product.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -176,9 +170,6 @@ export function SellProducts({ compact = false, onSaleSuccess }: SellProductsPro
     compact && searchTerm.trim() === "" ? [] : filteredProducts;
   const hasSearch = searchTerm.trim() !== "";
 
-  // ============================================
-  // CARRITO
-  // ============================================
   const addToCart = (product: ExtendedProduct) => {
     if (!isCashRegisterOpen) return;
 
@@ -235,9 +226,6 @@ export function SellProducts({ compact = false, onSaleSuccess }: SellProductsPro
     setCart((prev) => prev.filter((item) => item.product.id !== productId));
   };
 
-  // ============================================
-  // TOTALES
-  // ============================================
   const getSubtotal = () => {
     return cart.reduce(
       (total, item) => total + item.product.precio * item.quantity,
@@ -249,9 +237,6 @@ export function SellProducts({ compact = false, onSaleSuccess }: SellProductsPro
     return getSubtotal() - discount;
   };
 
-  // ============================================
-  // DESCUENTO MANUAL
-  // ============================================
   const handleDiscountChange = (value: string) => {
     if (!isCashRegisterOpen) return;
 
@@ -265,9 +250,6 @@ export function SellProducts({ compact = false, onSaleSuccess }: SellProductsPro
     setDiscount(discountValue);
   };
 
-  // ============================================
-  // CUPONES
-  // ============================================
   const handleApplyCoupon = async () => {
     setCouponError(null);
 
@@ -326,10 +308,6 @@ export function SellProducts({ compact = false, onSaleSuccess }: SellProductsPro
     setCouponError(null);
   };
 
-  // ============================================
-  // PAGO
-  // ============================================
-  // ✅ CAMBIO: acepta null para permitir deselección si se desea
   const handlePaymentMethodChange = (
     method: "efectivo" | "qr" | "mixto" | null
   ) => {
@@ -372,9 +350,6 @@ export function SellProducts({ compact = false, onSaleSuccess }: SellProductsPro
     }
   };
 
-  // ============================================
-  // SCANNER
-  // ============================================
   const handleScanSuccess = (decodedText: string) => {
     setSearchTerm(decodedText);
     setShowScanner(false);
@@ -408,6 +383,13 @@ export function SellProducts({ compact = false, onSaleSuccess }: SellProductsPro
   // PROCESAR VENTA
   // ============================================
   const processSaleHandler = async () => {
+    // 🔒 CANDADO SÍNCRONO: ignora cualquier click si ya hay una venta en proceso.
+    // Funciona aunque React todavía no haya re-renderizado el botón.
+    if (processingRef.current) {
+      console.warn("[processSale] Click ignorado: venta ya en proceso");
+      return;
+    }
+
     if (!isCashRegisterOpen) {
       toast({
         title: "Caja cerrada",
@@ -435,11 +417,11 @@ export function SellProducts({ compact = false, onSaleSuccess }: SellProductsPro
       return;
     }
 
-    // ✅ CAMBIO: validar que exista un método de pago seleccionado
     if (!paymentMethod) {
       toast({
         title: "Método de pago requerido",
-        description: "Debes seleccionar una forma de pago antes de procesar la venta.",
+        description:
+          "Debes seleccionar una forma de pago antes de procesar la venta.",
         variant: "destructive",
       });
       return;
@@ -470,9 +452,11 @@ export function SellProducts({ compact = false, onSaleSuccess }: SellProductsPro
       }
     }
 
-    try {
-      setIsProcessing(true);
+    // 🔒 Activar candado ANTES del await
+    processingRef.current = true;
+    setIsProcessing(true);
 
+    try {
       const saleData: SaleRequest = {
         productos: cart.map((item) => ({
           producto_id: parseInt(item.product.id),
@@ -512,30 +496,40 @@ export function SellProducts({ compact = false, onSaleSuccess }: SellProductsPro
       setDiscount(0);
       setDiscountReason("");
       setShowDiscountField(false);
-      setPaymentMethod(null); // ✅ CAMBIO: reset a null
+      setPaymentMethod(null);
       setSearchTerm("");
       setAppliedCoupon(null);
       setCouponCode("");
       setCouponError(null);
+      setConfirmOpen(false); // 🔒 cerrar diálogo
 
       await loadProducts();
 
-      // 🔔 Notificar al contenedor (para que el panel flotante se cierre)
       onSaleSuccess?.();
     } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "No se pudo procesar la venta",
-        variant: "destructive",
-      });
+      const msg = error?.message || "No se pudo procesar la venta";
+
+      // 🔒 Manejar el 409 del backend (doble submit concurrente)
+      if (msg.includes("Ya hay una venta en proceso")) {
+        toast({
+          title: "Venta en proceso",
+          description:
+            "Ya hay una venta procesándose. Espera a que termine antes de reintentar.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: msg,
+          variant: "destructive",
+        });
+      }
     } finally {
+      processingRef.current = false;
       setIsProcessing(false);
     }
   };
 
-  // ============================================
-  // HELPERS
-  // ============================================
   const displayStock = (product: ExtendedProduct) => {
     if (product.sinStock) return "Ilimitado";
     return product.stock.toString();
@@ -551,7 +545,7 @@ export function SellProducts({ compact = false, onSaleSuccess }: SellProductsPro
   };
 
   // ============================================
-  // RENDER MODO COMPACTO (tipo chat)
+  // RENDER MODO COMPACTO
   // ============================================
   if (compact) {
     return (
@@ -563,7 +557,6 @@ export function SellProducts({ compact = false, onSaleSuccess }: SellProductsPro
           />
         )}
 
-        {/* Header compacto */}
         <div className="flex items-center justify-between px-3 py-2 border-b bg-card flex-shrink-0">
           <div className="flex items-center gap-2">
             <ShoppingCart className="w-4 h-4 text-primary" />
@@ -577,7 +570,6 @@ export function SellProducts({ compact = false, onSaleSuccess }: SellProductsPro
           </Badge>
         </div>
 
-        {/* Buscador sticky */}
         <div className="px-3 py-2 border-b bg-card flex-shrink-0">
           <div className="relative">
             <Search className="absolute left-2 top-2 h-3.5 w-3.5 text-muted-foreground" />
@@ -591,7 +583,6 @@ export function SellProducts({ compact = false, onSaleSuccess }: SellProductsPro
           </div>
         </div>
 
-        {/* Área scrolleable */}
         <div className="flex-1 overflow-y-auto custom-scrollbar px-3 py-2 space-y-2">
           {hasSearch && (
             <div className="space-y-1.5">
@@ -818,7 +809,6 @@ export function SellProducts({ compact = false, onSaleSuccess }: SellProductsPro
               </div>
 
               <div className="grid grid-cols-3 gap-1">
-                {/* ✅ CAMBIO: sin selección por defecto */}
                 <button
                   onClick={() => handlePaymentMethodChange("efectivo")}
                   disabled={!isCashRegisterOpen}
@@ -920,7 +910,7 @@ export function SellProducts({ compact = false, onSaleSuccess }: SellProductsPro
   }
 
   // ============================================
-  // RENDER NORMAL (vista completa en /admin/sell)
+  // RENDER NORMAL
   // ============================================
   return (
     <div className="space-y-6">
@@ -1464,7 +1454,6 @@ export function SellProducts({ compact = false, onSaleSuccess }: SellProductsPro
                 <div className="space-y-3">
                   <Label>Forma de pago</Label>
                   <div className="grid grid-cols-3 gap-2">
-                    {/* ✅ CAMBIO: sin selección por defecto */}
                     <Button
                       type="button"
                       variant={
@@ -1540,12 +1529,15 @@ export function SellProducts({ compact = false, onSaleSuccess }: SellProductsPro
                   )}
                 </div>
 
-                <Dialog>
+                {/* 🔒 Diálogo CONTROLADO */}
+                <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
                   <DialogTrigger asChild>
                     <Button
                       className="w-full"
                       size="lg"
-                      disabled={isProcessing || !isCashRegisterOpen || !paymentMethod}
+                      disabled={
+                        isProcessing || !isCashRegisterOpen || !paymentMethod
+                      }
                     >
                       {isProcessing ? (
                         <>
@@ -1574,9 +1566,13 @@ export function SellProducts({ compact = false, onSaleSuccess }: SellProductsPro
                       </DialogDescription>
                     </DialogHeader>
                     <div className="flex justify-end gap-2 pt-4">
-                      <DialogTrigger asChild>
-                        <Button variant="outline">Cancelar</Button>
-                      </DialogTrigger>
+                      <Button
+                        variant="outline"
+                        onClick={() => setConfirmOpen(false)}
+                        disabled={isProcessing}
+                      >
+                        Cancelar
+                      </Button>
                       <Button
                         onClick={processSaleHandler}
                         disabled={isProcessing}
