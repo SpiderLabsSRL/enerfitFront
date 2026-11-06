@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -97,6 +97,10 @@ export function EmployeeManagement() {
   const [horariosModalOpen, setHorariosModalOpen] = useState(false);
   const [horariosToShow, setHorariosToShow] = useState<HorarioVisualizacion[]>([]);
 
+  const [pendingEnrollEmployeeId, setPendingEnrollEmployeeId] = useState<
+    string | null
+  >(null);
+
   const [formData, setFormData] = useState({
     nombres: "",
     apellidos: "",
@@ -122,12 +126,95 @@ export function EmployeeManagement() {
 
   const { toast } = useToast();
 
+  // ============================================
+  // Helpers de pausa/reanudación
+  // ============================================
+  const pauseGlobalFingerprint = useCallback(() => {
+    (window as any).__FINGERPRINT_PAUSED__ = true;
+    window.dispatchEvent(
+      new CustomEvent("fingerprint-pause-changed", {
+        detail: { paused: true },
+      })
+    );
+  }, []);
+
+  const resumeGlobalFingerprint = useCallback(() => {
+    (window as any).__FINGERPRINT_PAUSED__ = false;
+    window.dispatchEvent(
+      new CustomEvent("fingerprint-pause-changed", {
+        detail: { paused: false },
+      })
+    );
+  }, []);
+
+  // ============================================
+  // FINGERPRINT HOOK
+  // ============================================
+  const { startEnroll, cancelEnroll } = useFingerprintEnroll({
+    onSuccess: () => {
+      setIsScannerOpen(false);
+      setPendingEnrollEmployeeId(null);
+      setIsRegisteringFingerprint(false);
+      setIsScanning(false);
+      resumeGlobalFingerprint();
+      loadData();
+      toast({
+        title: "✅ Huella registrada",
+        description: "La huella digital se ha guardado correctamente",
+      });
+    },
+    onError: (msg) => {
+      setIsScannerOpen(false);
+      setPendingEnrollEmployeeId(null);
+      setIsRegisteringFingerprint(false);
+      setIsScanning(false);
+      resumeGlobalFingerprint();
+      toast({
+        title: "⚠️ Error al registrar huella",
+        description: msg || "No se pudo guardar la huella digital",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // ============================================
+  // Pausar/Reanudar según estado del scanner
+  // ============================================
+  useEffect(() => {
+    if (isScannerOpen) {
+      pauseGlobalFingerprint();
+    } else {
+      resumeGlobalFingerprint();
+    }
+  }, [isScannerOpen, pauseGlobalFingerprint, resumeGlobalFingerprint]);
+
+  useEffect(() => {
+    return () => {
+      resumeGlobalFingerprint();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ============================================
+  // Abrir el enroll-stream (con setTimeout directo)
+  // ============================================
+  useEffect(() => {
+    if (!isScannerOpen || !pendingEnrollEmployeeId) return;
+
+    // Forzamos un tiempo de espera para que el backend cierre la conexión anterior
+    const timer = setTimeout(() => {
+      startEnroll(pendingEnrollEmployeeId);
+    }, 2500); // 2.5 segundos para estar seguros
+
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isScannerOpen, pendingEnrollEmployeeId]);
+
   useEffect(() => {
     loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ✅ CAMBIO: filtrar cajas por sucursal solo para roles que la requieren
   useEffect(() => {
     if (
       formData.sucursal_id > 0 &&
@@ -356,12 +443,10 @@ export function EmployeeManagement() {
 
     if (!formData.cargo) errors.cargo = "El cargo es obligatorio";
 
-    // ✅ CAMBIO: todos los roles requieren sucursal
     if (formData.cargo && !formData.sucursal_id) {
       errors.sucursal_id = "La sucursal es obligatoria";
     }
 
-    // ✅ CAMBIO: solo roles con horarios requieren horarios (admin NO)
     if (formData.cargo && !ROLES_SIN_HORARIO.includes(formData.cargo)) {
       const tieneHorarios = horarios.some((dia) => dia.horarios.length > 0);
       if (!tieneHorarios) {
@@ -369,7 +454,6 @@ export function EmployeeManagement() {
       }
     }
 
-    // ✅ CAMBIO: admin y recepcionista requieren caja
     if (ROLES_CON_CAJA.includes(formData.cargo) && !formData.caja_id) {
       errors.caja_id = "Debe seleccionar una caja";
     }
@@ -383,18 +467,6 @@ export function EmployeeManagement() {
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
-
-  // ============================================
-  // FINGERPRINT
-  // ============================================
-  const { startEnroll } = useFingerprintEnroll({
-    onSuccess: () => {
-      setIsRegisteringFingerprint(false);
-      setIsScanning(false);
-      setIsScannerOpen(false);
-      loadData();
-    },
-  });
 
   // ============================================
   // GUARDAR (abre el diálogo de confirmación)
@@ -413,7 +485,7 @@ export function EmployeeManagement() {
   // EJECUTAR GUARDADO (después de confirmar)
   // ============================================
   const executeSave = async () => {
-    let employeeIdToEnroll = "";
+    let personaIdToEnroll = "";
     setIsConfirming(true);
 
     const shouldEnrollFingerprint = formData.registrarHuella;
@@ -421,7 +493,6 @@ export function EmployeeManagement() {
     try {
       const horariosToSend: HorarioConSucursal[] = [];
 
-      // ✅ CAMBIO: solo enviar horarios si el rol los requiere
       if (!ROLES_SIN_HORARIO.includes(formData.cargo)) {
         for (const dia of horarios) {
           for (const horario of dia.horarios) {
@@ -437,7 +508,6 @@ export function EmployeeManagement() {
         }
       }
 
-      // ✅ CAMBIO: admin envía sucursal + caja, sin horarios
       const employeeRequest: EmployeeRequest = {
         nombres: formData.nombres,
         apellidos: formData.apellidos,
@@ -460,14 +530,16 @@ export function EmployeeManagement() {
           editingEmployee.id,
           employeeRequest
         );
-        employeeIdToEnroll = String(updatedEmployee.id);
+        // ✅ Usar persona_id
+        personaIdToEnroll = String(updatedEmployee.persona_id);
         toast({
           title: "Éxito",
           description: "Trabajador actualizado correctamente",
         });
       } else {
         const newEmployee = await createEmployee(employeeRequest);
-        employeeIdToEnroll = String(newEmployee.id);
+        // ✅ Usar persona_id
+        personaIdToEnroll = String(newEmployee.persona_id);
         toast({
           title: "Éxito",
           description: "Trabajador registrado correctamente",
@@ -475,21 +547,21 @@ export function EmployeeManagement() {
       }
 
       const idIsValid =
-        employeeIdToEnroll &&
-        employeeIdToEnroll !== "null" &&
-        employeeIdToEnroll !== "undefined" &&
-        employeeIdToEnroll !== "0" &&
-        !Number.isNaN(Number(employeeIdToEnroll));
+        personaIdToEnroll &&
+        personaIdToEnroll !== "null" &&
+        personaIdToEnroll !== "undefined" &&
+        personaIdToEnroll !== "0" &&
+        !Number.isNaN(Number(personaIdToEnroll));
 
       if (!idIsValid) {
         console.error(
-          "❌ ID de empleado inválido al intentar abrir el scanner:",
-          employeeIdToEnroll
+          "❌ ID de persona inválido al intentar abrir el scanner:",
+          personaIdToEnroll
         );
       }
 
       console.log("🟢 Empleado guardado:", {
-        empleado_id: employeeIdToEnroll,
+        persona_id: personaIdToEnroll,
         modo: editingEmployee ? "update" : "create",
         registrarHuella: shouldEnrollFingerprint,
         rol: formData.cargo,
@@ -501,10 +573,10 @@ export function EmployeeManagement() {
       await loadData();
 
       if (shouldEnrollFingerprint && idIsValid) {
+        setPendingEnrollEmployeeId(personaIdToEnroll);
         setIsScanning(true);
         setIsScannerOpen(true);
         setIsRegisteringFingerprint(true);
-        startEnroll(employeeIdToEnroll);
       }
     } catch (error: unknown) {
       let errorMessage = "Error al guardar el empleado";
@@ -817,7 +889,6 @@ export function EmployeeManagement() {
                     <Select
                       value={formData.cargo}
                       onValueChange={(value) => {
-                        // ✅ CAMBIO: todos los cargos requieren sucursal
                         setFormData((prev) => ({
                           ...prev,
                           cargo: value,
@@ -843,7 +914,6 @@ export function EmployeeManagement() {
                     )}
                   </div>
 
-                  {/* ✅ CAMBIO: sucursal siempre visible (todos la requieren) */}
                   {formData.cargo !== "" && (
                     <div className="grid gap-1">
                       <Label>
@@ -879,7 +949,6 @@ export function EmployeeManagement() {
                   )}
                 </div>
 
-                {/* ✅ CAMBIO: caja visible para admin y recepcionista */}
                 {ROLES_CON_CAJA.includes(formData.cargo) &&
                   formData.sucursal_id > 0 && (
                     <div className="grid gap-2">
@@ -916,7 +985,7 @@ export function EmployeeManagement() {
                   )}
               </div>
 
-              {/* ✅ CAMBIO: horarios visibles SOLO para roles que los requieren (admin NO) */}
+              {/* Horarios */}
               {formData.cargo !== "" &&
                 !ROLES_SIN_HORARIO.includes(formData.cargo) && (
                   <div className="space-y-4 p-3 bg-muted/30 rounded-lg">
@@ -1091,12 +1160,26 @@ export function EmployeeManagement() {
       <Dialog
         open={isScannerOpen}
         onOpenChange={(open) => {
+          if (!open) {
+            cancelEnroll();
+            setPendingEnrollEmployeeId(null);
+            setIsRegisteringFingerprint(false);
+            setIsScanning(false);
+            resumeGlobalFingerprint();
+          }
           setIsScannerOpen(open);
-          if (!open) resetForm();
         }}
       >
         <DialogContent className="max-w-[90vw] md:max-w-md">
-          <Card className="text-center">
+          <DialogHeader>
+            <DialogTitle className="text-center">
+              Registrando huella digital
+            </DialogTitle>
+            <DialogDescription className="text-center">
+              Coloca el dedo en el lector para capturar la huella
+            </DialogDescription>
+          </DialogHeader>
+          <Card className="text-center border-none bg-transparent">
             <CardContent className="pt-6">
               <div
                 className={`mx-auto w-24 h-24 md:w-32 md:h-32 rounded-full border-4 border-primary flex items-center justify-center ${
@@ -1320,7 +1403,6 @@ export function EmployeeManagement() {
             </Table>
           </div>
 
-          {/* Paginación Desktop */}
           {totalPages > 1 && (
             <div className="flex justify-center items-center gap-2 mt-4">
               <Button
@@ -1453,7 +1535,6 @@ export function EmployeeManagement() {
           </Card>
         ))}
 
-        {/* Paginación Móvil */}
         {totalPages > 1 && (
           <div className="flex justify-center items-center gap-2 mt-4">
             <Button
