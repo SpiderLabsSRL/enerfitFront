@@ -204,7 +204,8 @@ export function RemindersAdmin() {
   const sendMessage = async (member: NewMember | ExpiringMember | BirthdayMember, type: 'bienvenida' | 'vencimiento') => {
     try {
       // Limpiar el número de teléfono (eliminar espacios y caracteres especiales)
-      const cleanPhone = member.telefono.replace(/\D/g, '');
+      // PROTECCIÓN: Usamos optional chaining y fallback a string vacío
+      const cleanPhone = (member.telefono || '').replace(/\D/g, '');
 
       // Enviar mensaje a través de WhatsApp Web
       await sendWhatsAppMessage(cleanPhone, member.mensaje);
@@ -241,6 +242,7 @@ export function RemindersAdmin() {
       });
       return;
     }
+    // PROTECCIÓN: Validamos que el teléfono no sea null
     if (!person.telefono || person.telefono.replace(/\D/g, '').length < 6) {
       toast({
         title: "Sin teléfono",
