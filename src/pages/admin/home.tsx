@@ -46,6 +46,11 @@ export function Home() {
     }
   };
 
+  // Mensaje predefinido para WhatsApp
+  const whatsappMessage = encodeURIComponent(
+    "¡Hola gimnasio SAVAGE! Quisiera información por favor."
+  );
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       {/* Header/Navbar */}
@@ -204,7 +209,7 @@ export function Home() {
                 </div>
               </div>
               <p className="text-muted-foreground mb-6">
-                "Transformando vidas a través del fitness. Tu camino hacia una vida más saludable y fuerte comienza aquí."
+                "Más que levantar peso aquí construimos hábitos, salud y confianza. Un espacio diseñado para retarte hoy, cuidarte mañana y celebrar cada pequeño avance.¡Suda, sonríe y transforma tu energía!"
               </p>
               <div className="flex gap-4">
                 <a
@@ -257,16 +262,38 @@ export function Home() {
                 <div className="flex gap-3">
                   <MapPin className="h-5 w-5 text-primary flex-shrink-0 mt-1" />
                   <div>
-                    <p className="font-medium text-foreground mb-1">SAVAGE FITNESS CLUB</p>
-                    <p className="text-sm">
-                      Av. Simón López 275, Salon de Eventos 'La Riviera frente a la Corte Electoral, Cochabamba, Bolivia
-                    </p>
+                    <a
+                      href="https://maps.app.goo.gl/kaU6J78tvmC9PapL8"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block hover:text-primary transition-colors"
+                    >
+                      <p className="font-medium text-foreground mb-1 hover:text-primary transition-colors">SAVAGE FITNESS CLUB</p>
+                      <p className="text-sm">
+                        Av. Simón López 275, Salon de Eventos 'La Riviera frente a la Corte Electoral, Cochabamba, Bolivia
+                      </p>
+                    </a>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
                   <Phone className="h-5 w-5 text-primary" />
-                  <span className="font-medium">71751585</span> -
-                  <span className="font-medium">70716562</span>
+                  <a
+                    href={`https://wa.me/59171751585?text=${whatsappMessage}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-medium hover:text-primary transition-colors"
+                  >
+                    71751585
+                  </a>
+                  <span>-</span>
+                  <a
+                    href={`https://wa.me/59170716562?text=${whatsappMessage}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-medium hover:text-primary transition-colors"
+                  >
+                    70716562
+                  </a>
                 </div>
               </div>
             </div>

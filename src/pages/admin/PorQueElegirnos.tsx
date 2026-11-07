@@ -48,7 +48,7 @@ export function PorQueElegirnos() {
             ¿Por qué elegirnos?
           </h2>
           <p className="text-muted-foreground max-w-2xl mx-auto">
-            Instalaciones premium para tu transformación
+            Más que levantar peso aquí construimos hábitos, salud y confianza. Un espacio diseñado para retarte hoy, cuidarte mañana y celebrar cada pequeño avance. ¡Suda, sonríe y transforma tu energía!
           </p>
         </div>
 
