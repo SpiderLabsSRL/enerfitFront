@@ -2,6 +2,23 @@ import axios from "axios";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
+// ============================================================
+// MENSAJES POR DEFECTO — SAVAGE FITNESS CLUB
+// ============================================================
+export const MENSAJE_BIENVENIDA = `¡Gracias por ser parte de SAVAGE FITNESS CLUB! 🏋️‍♂️ Estamos emocionados de tenerte en nuestra familia fitness. Te invitamos a visitar nuestra página: https://enerfit.spiderlabsystems.com/home`;
+
+export const buildMensajeVencimiento = (
+  nombre: string,
+  fechaVencimiento: string,
+  diasRestantes: number
+): string =>
+  `¡Hola ${nombre}! 👋 Te saludamos de SAVAGE FITNESS CLUB 🏋️‍♂️ Tu membresía vence el ${fechaVencimiento} (${
+    diasRestantes === 1 ? "1 día restante" : `${diasRestantes} días restantes`
+  }). ¡No pierdas tu racha! Renueva hoy y sigue alcanzando tus metas. Visítanos: https://enerfit.spiderlabsystems.com/home`;
+
+// ============================================================
+// TIPOS
+// ============================================================
 export interface NewMember {
   id: string;
   nombre: string;
@@ -44,6 +61,9 @@ export interface ApiErrorResponse {
   error?: string;
 }
 
+// ============================================================
+// GET: NUEVOS MIEMBROS (bienvenida)
+// ============================================================
 export const getNewMembers = async (sucursalId: number): Promise<NewMember[]> => {
   try {
     const token = localStorage.getItem("token");
@@ -53,7 +73,14 @@ export const getNewMembers = async (sucursalId: number): Promise<NewMember[]> =>
         "Content-Type": "application/json",
       },
     });
-    return response.data;
+
+    const rows: NewMember[] = response.data;
+
+    // 🔑 Sobrescribe el mensaje por defecto con el de SAVAGE FITNESS CLUB
+    return rows.map((member) => ({
+      ...member,
+      mensaje: MENSAJE_BIENVENIDA,
+    }));
   } catch (error: any) {
     if (error.response) {
       const errorMessage =
@@ -69,6 +96,9 @@ export const getNewMembers = async (sucursalId: number): Promise<NewMember[]> =>
   }
 };
 
+// ============================================================
+// GET: MIEMBROS POR VENCER (recordatorio)
+// ============================================================
 export const getExpiringMembers = async (sucursalId: number): Promise<ExpiringMember[]> => {
   try {
     const token = localStorage.getItem("token");
@@ -78,7 +108,18 @@ export const getExpiringMembers = async (sucursalId: number): Promise<ExpiringMe
         "Content-Type": "application/json",
       },
     });
-    return response.data;
+
+    const rows: ExpiringMember[] = response.data;
+
+    // 🔑 Sobrescribe el mensaje con el recordatorio personalizado de SAVAGE FITNESS CLUB
+    return rows.map((member) => ({
+      ...member,
+      mensaje: buildMensajeVencimiento(
+        member.nombre,
+        member.fechaVencimiento,
+        member.diasRestantes
+      ),
+    }));
   } catch (error: any) {
     if (error.response) {
       const errorMessage =
@@ -94,6 +135,9 @@ export const getExpiringMembers = async (sucursalId: number): Promise<ExpiringMe
   }
 };
 
+// ============================================================
+// GET: CUMPLEAÑEROS
+// ============================================================
 export const getBirthdayMembers = async (sucursalId: number): Promise<BirthdayMember[]> => {
   try {
     const token = localStorage.getItem("token");
@@ -198,9 +242,9 @@ export const sendWhatsAppMessage = async (
     // Abrir WhatsApp Web con el número y mensaje predefinido
     const encodedMessage = encodeURIComponent(message);
     const whatsappUrl = `https://web.whatsapp.com/send?phone=${phone}&text=${encodedMessage}`;
-    
+
     // Abrir en una nueva ventana
-    window.open(whatsappUrl, '_blank');
+    window.open(whatsappUrl, "_blank");
   } catch (error: any) {
     throw new Error("Error al preparar el mensaje de WhatsApp");
   }
