@@ -157,8 +157,8 @@ export default function ClientSelection({
 
   const validateCI = (ci: string): boolean => {
     if (!ci) return true;
-    if (ci.length < 7 || ci.length > 12) {
-      setCiError("La cédula debe tener entre 7 y 12 caracteres");
+    if (ci.length < 5 || ci.length > 12) {
+      setCiError("La cédula debe tener entre 5 y 12 caracteres");
       return false;
     }
     if (/^[a-zA-Z]+$/.test(ci)) {
