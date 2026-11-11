@@ -21,6 +21,18 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
   Search,
   Plus,
   User,
@@ -31,17 +43,151 @@ import {
   RefreshCw,
   ChevronLeft,
   ChevronRight,
+  Calendar,
+  CalendarIcon,
+  X,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import * as AccessApi from "@/api/AccessApi";
-import { AccessLog, ApiMember, ClientAccessResponse } from "@/api/AccessApi";
+import {
+  AccessLog,
+  ApiMember,
+  ClientAccessResponse,
+  formatLocalYMD,
+  parseLocalYMD,
+} from "@/api/AccessApi";
 import { useUser } from "@/contexts/UserContext";
 import { useRealtimeAccessLogs } from "@/hooks/useRealtimeAccessLogs";
 import { useFingerprintIdentify } from "@/hooks/useFingerprintIdentify";
 import { MemberSubscriptionDetails } from "./MemberSubscriptionDetails";
 import { useNavigate } from "react-router-dom";
+import { cn } from "@/lib/utils";
 
 const PAGE_SIZE = 50;
+
+// ============================================
+// Tipos de modo de filtro por fecha
+// ============================================
+type DateFilterMode = "today" | "yesterday" | "last7" | "specific" | "range";
+
+const DATE_MODE_LABELS: Record<DateFilterMode, string> = {
+  today: "Hoy",
+  yesterday: "Ayer",
+  last7: "Últimos 7 días",
+  specific: "Fecha específica",
+  range: "Rango de fechas",
+};
+
+// ============================================
+// CALENDARIO SIMPLE (idéntico a SalesControl)
+// ============================================
+function SimpleCalendar({
+  selected,
+  onSelect,
+}: {
+  selected?: Date;
+  onSelect: (date: Date) => void;
+}) {
+  const [currentDate, setCurrentDate] = useState(selected || new Date());
+  const months = [
+    "Enero",
+    "Febrero",
+    "Marzo",
+    "Abril",
+    "Mayo",
+    "Junio",
+    "Julio",
+    "Agosto",
+    "Septiembre",
+    "Octubre",
+    "Noviembre",
+    "Diciembre",
+  ];
+  const weekDays = ["Do", "Lu", "Ma", "Mi", "Ju", "Vi", "Sa"];
+
+  const getDaysInMonth = (date: Date) =>
+    new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+  const getFirstDayOfMonth = (date: Date) =>
+    new Date(date.getFullYear(), date.getMonth(), 1).getDay();
+
+  const handlePrevMonth = () =>
+    setCurrentDate(
+      new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1)
+    );
+  const handleNextMonth = () =>
+    setCurrentDate(
+      new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1)
+    );
+
+  const daysInMonth = getDaysInMonth(currentDate);
+  const firstDay = getFirstDayOfMonth(currentDate);
+
+  const days: (number | null)[] = [];
+  for (let i = 0; i < firstDay; i++) days.push(null);
+  for (let i = 1; i <= daysInMonth; i++) days.push(i);
+
+  const isSelectedDate = (day: number) => {
+    if (!selected) return false;
+    return (
+      selected.getDate() === day &&
+      selected.getMonth() === currentDate.getMonth() &&
+      selected.getFullYear() === currentDate.getFullYear()
+    );
+  };
+
+  return (
+    <div className="p-3 w-[280px] max-w-[90vw]">
+      <div className="flex items-center justify-between mb-4">
+        <Button variant="outline" size="sm" onClick={handlePrevMonth}>
+          {"<"}
+        </Button>
+        <span className="font-medium text-sm">
+          {months[currentDate.getMonth()]} {currentDate.getFullYear()}
+        </span>
+        <Button variant="outline" size="sm" onClick={handleNextMonth}>
+          {">"}
+        </Button>
+      </div>
+      <div className="grid grid-cols-7 gap-1 text-center mb-2">
+        {weekDays.map((day) => (
+          <div key={day} className="text-xs font-medium text-muted-foreground">
+            {day}
+          </div>
+        ))}
+      </div>
+      <div className="grid grid-cols-7 gap-1">
+        {days.map((day, index) => (
+          <div key={index} className="text-center">
+            {day !== null ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  "h-8 w-8 p-0 font-normal",
+                  isSelectedDate(day) &&
+                    "bg-primary text-black hover:bg-primary/90"
+                )}
+                onClick={() =>
+                  onSelect(
+                    new Date(
+                      currentDate.getFullYear(),
+                      currentDate.getMonth(),
+                      day
+                    )
+                  )
+                }
+              >
+                {day}
+              </Button>
+            ) : (
+              <div className="h-8 w-8" />
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export function AccessControlAdmin() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -67,7 +213,7 @@ export function AccessControlAdmin() {
     useState<ApiMember | null>(null);
 
   // ============================================
-  // 🆕 Selección de servicio tras huella (2+ servicios)
+  // Selección de servicio tras huella (2+ servicios)
   // ============================================
   const [fingerprintSelection, setFingerprintSelection] = useState<{
     memberId: string;
@@ -90,6 +236,15 @@ export function AccessControlAdmin() {
   const [showLogSearch, setShowLogSearch] = useState(false);
   const [logSearchTerm, setLogSearchTerm] = useState("");
   const logSearchInputRef = useRef<HTMLInputElement | null>(null);
+
+  // ============================================
+  // Filtro por fechas - Modo explícito
+  // ============================================
+  const [dateMode, setDateMode] = useState<DateFilterMode>("today");
+  const [specificDate, setSpecificDate] = useState<string>("");
+  const [rangeStart, setRangeStart] = useState<string>("");
+  const [rangeEnd, setRangeEnd] = useState<string>("");
+  const [showDateFilter, setShowDateFilter] = useState(false);
 
   // ============================================
   // Paginación
@@ -125,7 +280,7 @@ export function AccessControlAdmin() {
   const mostRecentLogId = allLogs.length > 0 ? allLogs[0].id : null;
 
   // ============================================
-  // Filtrado por búsqueda de logs (frontend, solo hoy)
+  // Filtrado por búsqueda de logs (frontend)
   // ============================================
   const filteredLogs = useMemo(() => {
     const rawTerm = logSearchTerm.trim().toLowerCase();
@@ -192,13 +347,103 @@ export function AccessControlAdmin() {
     }
   }, [showLogSearch]);
 
+  // ============================================
+  // Helpers de fecha
+  // ============================================
+  const getTodayYMD = () => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  };
+
+  const getYesterdayYMD = () => {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  };
+
+  const getLast7Range = () => {
+    const end = new Date();
+    const start = new Date();
+    start.setDate(start.getDate() - 6);
+
+    const fmt = (d: Date) => {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return `${y}-${m}-${day}`;
+    };
+
+    return { start: fmt(start), end: fmt(end) };
+  };
+
+  // ============================================
+  // Calcular rango real según el modo
+  // ============================================
+  const getEffectiveDateRange = (
+    mode: DateFilterMode,
+    specific: string,
+    rStart: string,
+    rEnd: string
+  ): { startDate?: string; endDate?: string; valid: boolean } => {
+    switch (mode) {
+      case "today": {
+        const today = getTodayYMD();
+        return { startDate: today, endDate: today, valid: true };
+      }
+      case "yesterday": {
+        const yesterday = getYesterdayYMD();
+        return { startDate: yesterday, endDate: yesterday, valid: true };
+      }
+      case "last7": {
+        const { start, end } = getLast7Range();
+        return { startDate: start, endDate: end, valid: true };
+      }
+      case "specific": {
+        if (!specific) return { valid: false };
+        return { startDate: specific, endDate: specific, valid: true };
+      }
+      case "range": {
+        if (!rStart || !rEnd) return { valid: false };
+        if (rStart > rEnd) return { valid: false };
+        return { startDate: rStart, endDate: rEnd, valid: true };
+      }
+      default:
+        return { valid: false };
+    }
+  };
+
+  // ============================================
+  // Cargar logs (depende del modo de fecha + searchTerm)
+  // ============================================
   const loadAccessLogs = async () => {
+    const effective = getEffectiveDateRange(
+      dateMode,
+      specificDate,
+      rangeStart,
+      rangeEnd
+    );
+
+    if (!effective.valid) {
+      setAccessLogs([]);
+      return;
+    }
+
     try {
       setIsLoading(true);
       const logs = await AccessApi.getAccessLogs({
         typeFilter,
         limit: 500,
         branchId: user?.idsucursal,
+        startDate: effective.startDate,
+        endDate: effective.endDate,
+        // Búsqueda por nombre/CI dentro del rango seleccionado
+        searchTerm: searchTerm.trim() || undefined,
       });
       setAccessLogs(logs);
       clearNewLogs();
@@ -212,6 +457,26 @@ export function AccessControlAdmin() {
       setIsLoading(false);
     }
   };
+
+  // Recargar cuando cambia el modo o las fechas
+  useEffect(() => {
+    loadAccessLogs();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dateMode, specificDate, rangeStart, rangeEnd]);
+
+  // Debounce para búsqueda por nombre en logs
+  useEffect(() => {
+    const t = setTimeout(() => {
+      loadAccessLogs();
+    }, 350);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchTerm]);
+
+  // Resetear página cuando cambia el modo de fecha
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [dateMode, specificDate, rangeStart, rangeEnd]);
 
   const searchMembers = async () => {
     if (searchTerm.length > 1) {
@@ -269,7 +534,6 @@ export function AccessControlAdmin() {
       console.warn("Sin sucursal, no se busca");
       return;
     }
-    // 🆕 Si estamos esperando selección de huella, NO hacer la búsqueda manual
     if (isFingerReaded || fingerprintProcessing || fingerprintSelection) return;
 
     const delayDebounce = setTimeout(() => {
@@ -281,7 +545,7 @@ export function AccessControlAdmin() {
   }, [searchTerm, typeFilter, user?.idsucursal, isFingerReaded, fingerprintProcessing, fingerprintSelection]);
 
   // ============================================
-  // 🆕 HUELLA → registro directo en backend
+  // HUELLA → registro directo en backend
   // ============================================
   useFingerprintIdentify({
     onVerified: async (ci) => {
@@ -296,7 +560,6 @@ export function AccessControlAdmin() {
 
       setFingerprintProcessing(true);
       setIsFingerReaded(true);
-      // Ocultar resultados de búsqueda manual previa
       setMembers([]);
 
       try {
@@ -306,7 +569,6 @@ export function AccessControlAdmin() {
           user.idusuario
         );
 
-        // Log creado → insertarlo de inmediato en la lista
         if (res.log) {
           prependLog(res.log);
         }
@@ -345,7 +607,6 @@ export function AccessControlAdmin() {
           }
 
           case "requires_selection": {
-            // Excepción: 2+ servicios → mostrar picker
             if (res.services && res.services.length > 1) {
               setFingerprintSelection({
                 memberId: res.memberId!,
@@ -389,7 +650,7 @@ export function AccessControlAdmin() {
   });
 
   // ============================================
-  // 🆕 Selección manual de servicio tras huella
+  // Selección manual de servicio tras huella
   // ============================================
   const handleFingerprintServicePick = async (
     service: AccessApi.FingerprintServiceOption
@@ -820,6 +1081,49 @@ export function AccessControlAdmin() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [newLogs]);
 
+  // ============================================
+  // Label dinámico del filtro de fechas
+  // ============================================
+  const dateFilterLabel = useMemo(() => {
+    switch (dateMode) {
+      case "today":
+        return "Hoy";
+      case "yesterday":
+        return "Ayer";
+      case "last7": {
+        const { start, end } = getLast7Range();
+        return `${formatLocalYMD(start)} → ${formatLocalYMD(end)}`;
+      }
+      case "specific": {
+        if (!specificDate) return "Fecha específica";
+        return formatLocalYMD(specificDate);
+      }
+      case "range": {
+        if (!rangeStart || !rangeEnd) return "Rango de fechas";
+        return `${formatLocalYMD(rangeStart)} → ${formatLocalYMD(rangeEnd)}`;
+      }
+      default:
+        return "Hoy";
+    }
+  }, [dateMode, specificDate, rangeStart, rangeEnd]);
+
+  // ============================================
+  // Validación del modo activo
+  // ============================================
+  const isDateModeValid = useMemo(() => {
+    if (dateMode === "specific") return Boolean(specificDate);
+    if (dateMode === "range")
+      return Boolean(rangeStart && rangeEnd && rangeStart <= rangeEnd);
+    return true;
+  }, [dateMode, specificDate, rangeStart, rangeEnd]);
+
+  // ============================================
+  // Cambio de modo
+  // ============================================
+  const handleDateModeChange = (mode: DateFilterMode) => {
+    setDateMode(mode);
+  };
+
   return (
     <div className="space-y-4 md:space-y-6">
       <div>
@@ -835,6 +1139,9 @@ export function AccessControlAdmin() {
         <CardHeader className="pb-3 md:pb-6">
           <CardTitle className="flex items-center gap-2 text-base md:text-lg">
             Registro de Accesos
+            <Badge variant="secondary" className="text-[10px] font-normal">
+              {dateFilterLabel}
+            </Badge>
             {newLogs.length > 0 && (
               <Badge variant="destructive" className="animate-pulse text-xs">
                 <Bell className="h-3 w-3 mr-1" />
@@ -849,7 +1156,7 @@ export function AccessControlAdmin() {
             <div className="relative w-full">
               <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Buscar por nombre o CI..."
+                placeholder="Buscar por nombre o CI (miembros y registros del rango)..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10 w-full"
@@ -884,7 +1191,25 @@ export function AccessControlAdmin() {
                 </Button>
               </div>
 
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {/* Botón de filtro por fechas */}
+                <Button
+                  variant={showDateFilter ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setShowDateFilter((v) => !v)}
+                  className="h-8 px-2 flex-shrink-0"
+                  title="Filtrar por fechas"
+                >
+                  <Calendar className="h-3.5 w-3.5 sm:mr-1" />
+                  <span className="hidden sm:inline text-xs">
+                    {dateFilterLabel}
+                  </span>
+                  {dateMode !== "today" && (
+                    <span className="sm:hidden text-xs ml-1">•</span>
+                  )}
+                </Button>
+
+                {/* Botón de búsqueda en logs */}
                 <Button
                   variant={showLogSearch ? "default" : "outline"}
                   size="sm"
@@ -894,37 +1219,282 @@ export function AccessControlAdmin() {
                 >
                   <Search className="h-3.5 w-3.5" />
                 </Button>
+
                 {showLogSearch && (
                   <Input
                     ref={logSearchInputRef}
-                    placeholder="Buscar en registros de hoy..."
+                    placeholder="Buscar en registros..."
                     value={logSearchTerm}
                     onChange={(e) => setLogSearchTerm(e.target.value)}
                     className="h-8 w-[180px] sm:w-[220px] text-xs"
                   />
                 )}
-              </div>
 
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={loadAccessLogs}
-                disabled={isLoading}
-                className="h-8 flex-shrink-0"
-              >
-                <RefreshCw
-                  className={`h-3.5 w-3.5 ${isLoading ? "animate-spin" : ""} sm:mr-2`}
-                />
-                <span className="hidden sm:inline">
-                  {isLoading ? "Actualizando..." : "Actualizar"}
-                </span>
-              </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={loadAccessLogs}
+                  disabled={isLoading || !isDateModeValid}
+                  className="h-8 flex-shrink-0"
+                >
+                  <RefreshCw
+                    className={`h-3.5 w-3.5 ${isLoading ? "animate-spin" : ""} sm:mr-2`}
+                  />
+                  <span className="hidden sm:inline">
+                    {isLoading ? "Actualizando..." : "Actualizar"}
+                  </span>
+                </Button>
+              </div>
             </div>
+
+            {/* Panel de filtro por fechas - Select + calendario bonito (Popover) */}
+            {showDateFilter && (
+              <div className="w-full p-3 border rounded-lg bg-muted/30 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-medium flex items-center gap-2">
+                    <Calendar className="h-4 w-4" />
+                    Filtrar por fechas
+                  </h4>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowDateFilter(false)}
+                    className="h-7 w-7 p-0"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+
+                {/* Select de modo + calendario al lado */}
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                  <div className="sm:w-[200px] flex-shrink-0">
+                    <Select
+                      value={dateMode}
+                      onValueChange={(v) =>
+                        handleDateModeChange(v as DateFilterMode)
+                      }
+                    >
+                      <SelectTrigger className="h-9 text-sm">
+                        <SelectValue placeholder="Seleccione un rango" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="today">
+                          <span className="flex items-center gap-2">
+                            <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+                            Hoy
+                          </span>
+                        </SelectItem>
+                        <SelectItem value="yesterday">
+                          <span className="flex items-center gap-2">
+                            <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+                            Ayer
+                          </span>
+                        </SelectItem>
+                        <SelectItem value="last7">
+                          <span className="flex items-center gap-2">
+                            <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+                            Últimos 7 días
+                          </span>
+                        </SelectItem>
+                        <SelectItem value="specific">
+                          <span className="flex items-center gap-2">
+                            <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+                            Fecha específica
+                          </span>
+                        </SelectItem>
+                        <SelectItem value="range">
+                          <span className="flex items-center gap-2">
+                            <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+                            Rango de fechas
+                          </span>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Fecha específica - Popover con calendario bonito */}
+                  {dateMode === "specific" && (
+                    <div className="flex-shrink-0">
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className="h-9 w-[180px] justify-start text-sm font-normal"
+                          >
+                            <CalendarIcon className="mr-2 h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                            <span className="truncate">
+                              {specificDate
+                                ? formatLocalYMD(specificDate)
+                                : "Seleccionar fecha"}
+                            </span>
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <SimpleCalendar
+                            selected={
+                              specificDate
+                                ? parseLocalYMD(specificDate) || undefined
+                                : undefined
+                            }
+                            onSelect={(d) => {
+                              const y = d.getFullYear();
+                              const m = String(d.getMonth() + 1).padStart(
+                                2,
+                                "0"
+                              );
+                              const day = String(d.getDate()).padStart(2, "0");
+                              setSpecificDate(`${y}-${m}-${day}`);
+                            }}
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                  )}
+
+                  {/* Rango - dos Popover con calendario bonito */}
+                  {dateMode === "range" && (
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                      <div className="flex-shrink-0">
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              className="h-9 w-[180px] justify-start text-sm font-normal"
+                            >
+                              <CalendarIcon className="mr-2 h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                              <span className="truncate">
+                                {rangeStart
+                                  ? `Desde: ${formatLocalYMD(rangeStart)}`
+                                  : "Desde"}
+                              </span>
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent
+                            className="w-auto p-0"
+                            align="start"
+                          >
+                            <SimpleCalendar
+                              selected={
+                                rangeStart
+                                  ? parseLocalYMD(rangeStart) || undefined
+                                  : undefined
+                              }
+                              onSelect={(d) => {
+                                const y = d.getFullYear();
+                                const m = String(d.getMonth() + 1).padStart(
+                                  2,
+                                  "0"
+                                );
+                                const day = String(d.getDate()).padStart(
+                                  2,
+                                  "0"
+                                );
+                                setRangeStart(`${y}-${m}-${day}`);
+                              }}
+                            />
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                      <div className="flex-shrink-0">
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              className="h-9 w-[180px] justify-start text-sm font-normal"
+                            >
+                              <CalendarIcon className="mr-2 h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                              <span className="truncate">
+                                {rangeEnd
+                                  ? `Hasta: ${formatLocalYMD(rangeEnd)}`
+                                  : "Hasta"}
+                              </span>
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent
+                            className="w-auto p-0"
+                            align="start"
+                          >
+                            <SimpleCalendar
+                              selected={
+                                rangeEnd
+                                  ? parseLocalYMD(rangeEnd) || undefined
+                                  : undefined
+                              }
+                              onSelect={(d) => {
+                                const y = d.getFullYear();
+                                const m = String(d.getMonth() + 1).padStart(
+                                  2,
+                                  "0"
+                                );
+                                const day = String(d.getDate()).padStart(
+                                  2,
+                                  "0"
+                                );
+                                setRangeEnd(`${y}-${m}-${day}`);
+                              }}
+                            />
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Mensajes de validación */}
+                {dateMode === "specific" && !specificDate && (
+                  <p className="text-[11px] text-amber-600 flex items-center gap-1">
+                    <AlertTriangle className="h-3 w-3" />
+                    Seleccione una fecha para aplicar el filtro.
+                  </p>
+                )}
+
+                {dateMode === "range" && (!rangeStart || !rangeEnd) && (
+                  <p className="text-[11px] text-amber-600 flex items-center gap-1">
+                    <AlertTriangle className="h-3 w-3" />
+                    Seleccione ambas fechas para aplicar el filtro.
+                  </p>
+                )}
+
+                {dateMode === "range" &&
+                  rangeStart &&
+                  rangeEnd &&
+                  rangeStart > rangeEnd && (
+                    <p className="text-[11px] text-rose-600 flex items-center gap-1">
+                      <AlertTriangle className="h-3 w-3" />
+                      La fecha "Desde" no puede ser mayor que "Hasta".
+                    </p>
+                  )}
+
+                {/* Resumen del filtro activo */}
+                <div className="pt-2 border-t flex items-center justify-between gap-2">
+                  <span className="text-xs text-muted-foreground truncate">
+                    Mostrando:{" "}
+                    <span className="font-medium text-foreground">
+                      {dateFilterLabel}
+                    </span>
+                    {searchTerm.trim() && (
+                      <span className="ml-1">
+                        · Búsqueda:{" "}
+                        <span className="font-medium text-foreground">
+                          "{searchTerm.trim()}"
+                        </span>
+                      </span>
+                    )}
+                  </span>
+                  <Badge
+                    variant={isDateModeValid ? "default" : "destructive"}
+                    className="text-[10px] flex-shrink-0"
+                  >
+                    {isDateModeValid
+                      ? DATE_MODE_LABELS[dateMode]
+                      : "Incompleto"}
+                  </Badge>
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* ============================================ */}
-          {/* 🆕 HUELLA EN PROCESO */}
-          {/* ============================================ */}
+          {/* HUELLA EN PROCESO */}
           {fingerprintProcessing && (
             <div className="mb-4 md:mb-6 p-3 md:p-4 border rounded-lg bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800 flex items-center gap-3">
               <Fingerprint className="h-5 w-5 text-blue-600 animate-pulse flex-shrink-0" />
@@ -934,9 +1504,7 @@ export function AccessControlAdmin() {
             </div>
           )}
 
-          {/* ============================================ */}
-          {/* 🆕 SELECCIÓN DE SERVICIO TRAS HUELLA (2+ servicios) */}
-          {/* ============================================ */}
+          {/* SELECCIÓN DE SERVICIO TRAS HUELLA (2+ servicios) */}
           {fingerprintSelection && (
             <div className="mb-4 md:mb-6 p-3 md:p-4 border-2 border-amber-300 dark:border-amber-700 rounded-lg bg-amber-50 dark:bg-amber-950/30">
               <h3 className="text-sm font-semibold mb-3 flex items-center gap-2 text-amber-800 dark:text-amber-200">
@@ -1194,7 +1762,16 @@ export function AccessControlAdmin() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {isLoading && accessLogs.length === 0 ? (
+                  {!isDateModeValid ? (
+                    <TableRow>
+                      <TableCell
+                        colSpan={5}
+                        className="text-center py-4 text-amber-600"
+                      >
+                        Complete la fecha o el rango para ver los registros
+                      </TableCell>
+                    </TableRow>
+                  ) : isLoading && accessLogs.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={5} className="text-center py-4">
                         Cargando registros...
@@ -1203,9 +1780,9 @@ export function AccessControlAdmin() {
                   ) : paginatedLogs.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={5} className="text-center py-4">
-                        {logSearchTerm
+                        {logSearchTerm || searchTerm
                           ? "No se encontraron registros con ese criterio"
-                          : "No hay registros de acceso hoy"}
+                          : "No hay registros de acceso para el rango seleccionado"}
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -1317,15 +1894,19 @@ export function AccessControlAdmin() {
             </div>
 
             <div className="md:hidden divide-y">
-              {isLoading && accessLogs.length === 0 ? (
+              {!isDateModeValid ? (
+                <div className="text-center py-6 text-sm text-amber-600">
+                  Complete la fecha o el rango para ver los registros
+                </div>
+              ) : isLoading && accessLogs.length === 0 ? (
                 <div className="text-center py-6 text-sm text-muted-foreground">
                   Cargando registros...
                 </div>
               ) : paginatedLogs.length === 0 ? (
                 <div className="text-center py-6 text-sm text-muted-foreground">
-                  {logSearchTerm
+                  {logSearchTerm || searchTerm
                     ? "No se encontraron registros con ese criterio"
-                    : "No hay registros de acceso hoy"}
+                    : "No hay registros de acceso para el rango seleccionado"}
                 </div>
               ) : (
                 paginatedLogs.map((log) => {

@@ -16,7 +16,7 @@ interface BackendAccessLog {
   tipo_persona: "cliente" | "empleado";
   persona_nombres?: string;
   persona_apellidos?: string;
-  persona_ci?: string; 
+  persona_ci?: string;
   servicio_nombre?: string;
 }
 
@@ -339,6 +339,8 @@ export const getAccessLogs = async (filters?: {
   typeFilter?: "all" | "client" | "employee";
   limit?: number;
   branchId?: number;
+  startDate?: string; // YYYY-MM-DD
+  endDate?: string;   // YYYY-MM-DD
 }): Promise<AccessLog[]> => {
   try {
     const params = new URLSearchParams();
@@ -357,7 +359,14 @@ export const getAccessLogs = async (filters?: {
     const y = hoyLocal.getFullYear();
     const m = String(hoyLocal.getMonth() + 1).padStart(2, "0");
     const d = String(hoyLocal.getDate()).padStart(2, "0");
-    params.append("startDate", `${y}-${m}-${d}`);
+    const hoyYMD = `${y}-${m}-${d}`;
+
+    // 🆕 Filtro por fechas: si no se envían, se usa solo hoy
+    const startDate = filters?.startDate || hoyYMD;
+    const endDate = filters?.endDate || hoyYMD;
+
+    params.append("startDate", startDate);
+    params.append("endDate", endDate);
 
     const response = await api.get<BackendAccessLog[]>(
       `/access/logs?${params.toString()}`
