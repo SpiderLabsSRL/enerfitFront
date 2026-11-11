@@ -173,14 +173,13 @@ export default function ClientSelection({
     return true;
   };
 
+  // ✅ Validación de teléfono: acepta formato internacional (+, espacios, guiones, paréntesis)
   const validatePhone = (phone: string): boolean => {
     if (!phone) return true;
-    if (!/^\d+$/.test(phone)) {
-      setPhoneError("El teléfono solo puede contener números");
-      return false;
-    }
-    if (phone.length !== 8) {
-      setPhoneError("El teléfono debe tener exactamente 8 dígitos");
+    if (!/^[\d+\s\-()]+$/.test(phone)) {
+      setPhoneError(
+        "El teléfono solo puede contener números, +, espacios, guiones o paréntesis"
+      );
       return false;
     }
     setPhoneError("");
@@ -746,9 +745,8 @@ export default function ClientSelection({
                     setNewClient({ ...newClient, telefono: e.target.value });
                     validatePhone(e.target.value);
                   }}
-                  maxLength={8}
                   className="bg-input border-border text-foreground focus:ring-2 focus:ring-primary/50 transition-all rounded-xl"
-                  placeholder="Ej: 71234567"
+                  placeholder="Ej: +5 454849"
                   disabled={isCreating}
                 />
                 {phoneError && (

@@ -203,12 +203,9 @@ export function RemindersAdmin() {
 
   const sendMessage = async (member: NewMember | ExpiringMember | BirthdayMember, type: 'bienvenida' | 'vencimiento') => {
     try {
-      // Limpiar el número de teléfono (eliminar espacios y caracteres especiales)
-      // PROTECCIÓN: Usamos optional chaining y fallback a string vacío
-      const cleanPhone = (member.telefono || '').replace(/\D/g, '');
-
-      // Enviar mensaje a través de WhatsApp Web
-      await sendWhatsAppMessage(cleanPhone, member.mensaje);
+      // ✅ Enviamos el teléfono TAL CUAL (con +, espacios, etc.)
+      // sendWhatsAppMessage internamente lo normaliza a solo dígitos para wa.me
+      await sendWhatsAppMessage(member.telefono || '', member.mensaje);
 
       toast({
         title: "Mensaje preparado",
@@ -242,7 +239,7 @@ export function RemindersAdmin() {
       });
       return;
     }
-    // PROTECCIÓN: Validamos que el teléfono no sea null
+    // Validamos que el teléfono tenga al menos 6 dígitos (incluyendo código de país)
     if (!person.telefono || person.telefono.replace(/\D/g, '').length < 6) {
       toast({
         title: "Sin teléfono",
@@ -253,8 +250,8 @@ export function RemindersAdmin() {
     }
 
     try {
-      const cleanPhone = person.telefono.replace(/\D/g, '');
-      await sendWhatsAppMessage(cleanPhone, broadcastMessage);
+      // ✅ Enviamos el teléfono TAL CUAL (con +, espacios, etc.)
+      await sendWhatsAppMessage(person.telefono, broadcastMessage);
       markAsSent(person.personaId);
       toast({
         title: "Mensaje preparado",

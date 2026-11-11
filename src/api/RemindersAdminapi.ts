@@ -62,6 +62,19 @@ export interface ApiErrorResponse {
 }
 
 // ============================================================
+// HELPER: normaliza un teléfono para WhatsApp (wa.me)
+// - Quita espacios, guiones, paréntesis y el signo +
+// - Deja SOLO dígitos (código de país + número)
+// - NO inventa prefijos: si el usuario escribió "+5 454849",
+//   se envía "5454849". Si escribió "+591 71234567",
+//   se envía "59171234567".
+// ============================================================
+export const normalizePhoneForWhatsApp = (phone: string): string => {
+  if (!phone) return "";
+  return phone.replace(/\D/g, "");
+};
+
+// ============================================================
 // GET: NUEVOS MIEMBROS (bienvenida)
 // ============================================================
 export const getNewMembers = async (sucursalId: number): Promise<NewMember[]> => {
@@ -234,18 +247,32 @@ export const getServiceNames = async (sucursalId: number): Promise<string[]> => 
   }
 };
 
+// ============================================================
+// ENVIAR WHATSAPP
+// Acepta el teléfono tal cual venga (con +, espacios, guiones).
+// Internamente lo normaliza a solo dígitos para wa.me.
+// ============================================================
 export const sendWhatsAppMessage = async (
   phone: string,
   message: string
 ): Promise<void> => {
   try {
-    // Abrir WhatsApp Web con el número y mensaje predefinido
-    const encodedMessage = encodeURIComponent(message);
-    const whatsappUrl = `https://web.whatsapp.com/send?phone=${phone}&text=${encodedMessage}`;
+    const cleanPhone = normalizePhoneForWhatsApp(phone);
 
-    // Abrir en una nueva ventana
+    if (!cleanPhone || cleanPhone.length < 6) {
+      throw new Error(
+        "El número de teléfono no es válido. Debe incluir el código de país (ej: 59171234567)."
+      );
+    }
+
+    const encodedMessage = encodeURIComponent(message);
+    // ✅ web.whatsapp.com acepta el número sin "+", solo dígitos
+    const whatsappUrl = `https://web.whatsapp.com/send?phone=${cleanPhone}&text=${encodedMessage}`;
+
     window.open(whatsappUrl, "_blank");
   } catch (error: any) {
-    throw new Error("Error al preparar el mensaje de WhatsApp");
+    throw new Error(
+      error.message || "Error al preparar el mensaje de WhatsApp"
+    );
   }
 };
