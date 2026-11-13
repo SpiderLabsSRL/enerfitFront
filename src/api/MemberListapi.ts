@@ -19,6 +19,8 @@ export interface Service {
 export interface Member {
   id: string;
   name: string;
+  nombres?: string;
+  apellidos?: string;
   ci: string;
   phone: string;
   birthDate: string;

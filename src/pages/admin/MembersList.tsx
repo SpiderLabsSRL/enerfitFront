@@ -1010,14 +1010,25 @@ export function MembersList() {
     isEditingRef.current = true;
 
     setMemberToEdit(member);
-    const nameParts = member.name.trim().split(/\s+/);
-    const apellidos =
-      nameParts.length > 1 ? nameParts[nameParts.length - 1] : "";
-    const nombres = nameParts.slice(0, -1).join(" ");
+
+    // ✅ Usar nombres/apellidos exactos que devuelve el backend.
+    // NO hacer split de member.name porque los apellidos pueden tener
+    // varias palabras (ej: "LIMA ALCALA").
+    let nombres = member.nombres ?? "";
+    let apellidos = member.apellidos ?? "";
+
+    // Fallback solo si el backend no los envió (registros antiguos).
+    if (!nombres && !apellidos) {
+      const fullName = (member.name || "").trim();
+      // Heurística segura: si no podemos separar con certeza,
+      // dejamos todo en nombres para que el usuario lo corrija manualmente.
+      nombres = fullName;
+      apellidos = "";
+    }
 
     setEditFormData({
-      nombres: nombres,
-      apellidos: apellidos,
+      nombres: nombres.trim(),
+      apellidos: apellidos.trim(),
       ci: member.ci,
       phone: member.phone,
     });
@@ -1097,6 +1108,20 @@ export function MembersList() {
       };
 
       await editMember(memberToEdit.id, payload);
+
+      // Actualiza el objeto local para reflejar los nuevos nombres/apellidos
+      setMemberToEdit((prev) =>
+        prev
+          ? {
+              ...prev,
+              nombres: payload.nombres,
+              apellidos: payload.apellidos,
+              name: `${payload.nombres} ${payload.apellidos}`.trim(),
+              ci: payload.ci,
+              phone: payload.phone,
+            }
+          : prev,
+      );
 
       toast({
         title: "✅ Cambios guardados",
