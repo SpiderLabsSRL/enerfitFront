@@ -287,12 +287,12 @@ export function Home() {
                   </a>
                   <span>-</span>
                   <a
-                    href={`https://wa.me/59170716562?text=${whatsappMessage}`}
+                    href={`https://wa.me/59164840640?text=${whatsappMessage}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="font-medium hover:text-primary transition-colors"
                   >
-                    70716562
+                    64840640
                   </a>
                 </div>
               </div>

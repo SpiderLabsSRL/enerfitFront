@@ -40,7 +40,7 @@ import { cn } from "@/lib/utils";
 // ============================================
 const NUMEROS_WHATSAPP = [
   { numero: "59171751585", etiqueta: "SAVAGE 1" },
-  { numero: "59170716562", etiqueta: "SAVAGE 2" },
+  { numero: "59164840640", etiqueta: "SAVAGE 2" },
 ] as const;
 
 export function Tienda() {
