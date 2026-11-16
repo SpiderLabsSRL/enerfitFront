@@ -5,7 +5,7 @@ const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 // ============================================================
 // MENSAJES POR DEFECTO — SAVAGE FITNESS CLUB
 // ============================================================
-export const MENSAJE_BIENVENIDA = `¡Gracias por ser parte de SAVAGE FITNESS CLUB! 🏋️‍♂️ Estamos emocionados de tenerte en nuestra familia fitness. Te invitamos a visitar nuestra página: https://enerfit.spiderlabsystems.com/home`;
+export const MENSAJE_BIENVENIDA = `¡Gracias por ser parte de SAVAGE FITNESS CLUB! 🏋️‍♂️ Estamos emocionados de tenerte en nuestra familia fitness. Te invitamos a visitar nuestra página: https://savage.spiderlabsystems.com/home`;
 
 export const buildMensajeVencimiento = (
   nombre: string,
@@ -14,7 +14,7 @@ export const buildMensajeVencimiento = (
 ): string =>
   `¡Hola ${nombre}! 👋 Te saludamos de SAVAGE FITNESS CLUB 🏋️‍♂️ Tu membresía vence el ${fechaVencimiento} (${
     diasRestantes === 1 ? "1 día restante" : `${diasRestantes} días restantes`
-  }). ¡No pierdas tu racha! Renueva hoy y sigue alcanzando tus metas. Visítanos: https://enerfit.spiderlabsystems.com/home`;
+  }). ¡No pierdas tu racha! Renueva hoy y sigue alcanzando tus metas. Visítanos: https://savage.spiderlabsystems.com/home`;
 
 // ============================================================
 // TIPOS
