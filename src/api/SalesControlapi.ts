@@ -1,4 +1,4 @@
-// src/api/SalesControlapi.ts
+// src/api/SalesControlapi.ts  (ENERFIT — fusionado con lógica de Mutant)
 import axios from "axios";
 import { getStoredUserData } from "./loginapi";
 
@@ -61,14 +61,24 @@ export interface Sucursal {
   name: string;
 }
 
+export interface Empleado {
+  id: string;
+  nombre: string;
+  sucursalId?: string | null;
+}
+
+export interface SalesPagination {
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+  totalProductos?: number;
+  totalServicios?: number;
+}
+
 export interface SalesResponse {
   sales: SaleRecord[];
-  pagination: {
-    page: number;
-    pageSize: number;
-    total: number;
-    totalPages: number;
-  };
+  pagination: SalesPagination;
 }
 
 export interface FilterTotals {
@@ -83,6 +93,21 @@ export interface FilterTotals {
   qrServicios: number;
 }
 
+export interface ResumenDetallado {
+  productos: {
+    items: { nombre: string; cantidad: number }[];
+    totalGeneral: number;
+    totalEfectivo: number;
+    totalQr: number;
+  };
+  servicios: {
+    items: { nombre: string; cantidad: number }[];
+    totalGeneral: number;
+    totalEfectivo: number;
+    totalQr: number;
+  };
+}
+
 export interface AnularVentaResponse {
   success: boolean;
   message: string;
@@ -90,7 +115,7 @@ export interface AnularVentaResponse {
   tipo: "producto" | "servicio";
 }
 
-interface SalesFilters {
+export interface SalesFilters {
   dateFilterType?:
     | "all"
     | "specific"
@@ -106,6 +131,8 @@ interface SalesFilters {
   endDate?: string;
   sucursal?: string;
   empleadoId?: string;
+  metodoPago?: "efectivo" | "qr" | "mixto" | "all";
+  tipo?: "producto" | "servicio";
   page?: number;
   pageSize?: number;
 }
@@ -116,22 +143,18 @@ interface SalesFilters {
 const api = axios.create({
   baseURL: API_URL,
   withCredentials: true,
-  headers: {
-    "Content-Type": "application/json",
-  },
+  headers: { "Content-Type": "application/json" },
 });
 
-// ✅ CAMBIO: preferir sessionStorage (sesión activa); fallback a localStorage
+// Preferir sessionStorage (sesión activa); fallback a localStorage
 api.interceptors.request.use((config) => {
   const token =
     sessionStorage.getItem("token") || localStorage.getItem("token");
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
+  if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
 
-// ✅ NUEVO: manejo global de 401
+// Manejo global de 401
 let isRedirectingToLogin = false;
 
 api.interceptors.response.use(
@@ -166,31 +189,26 @@ api.interceptors.response.use(
         window.location.replace("/login");
       }
     }
-
     return Promise.reject(error);
   }
 );
 
 // ============================================
-// HELPER: Aplica sucursal forzada si no es admin
+// HELPERS DE FILTROS FORZADOS
 // ============================================
 function withForcedSucursal(filters: SalesFilters): SalesFilters {
   const userData = getStoredUserData();
   if (!userData) return filters;
 
   const rol = (userData.rol || "").toLowerCase().trim();
-  if (rol === "admin" || rol === "superadmin") {
-    return filters;
-  }
+  if (rol === "admin" || rol === "superadmin") return filters;
+
   if (userData.idsucursal) {
     return { ...filters, sucursal: userData.idsucursal.toString() };
   }
   return filters;
 }
 
-// ============================================
-// HELPER: Fuerza empleadoId cuando el rol es recepcionista
-// ============================================
 function withForcedEmpleado(filters: SalesFilters): SalesFilters {
   const userData = getStoredUserData();
   if (!userData) return filters;
@@ -208,12 +226,27 @@ function withForcedEmpleado(filters: SalesFilters): SalesFilters {
       return { ...filters, empleadoId: usuarioForzado };
     }
   }
-
   return filters;
 }
 
 function applyForcedFilters(filters: SalesFilters): SalesFilters {
   return withForcedEmpleado(withForcedSucursal(filters));
+}
+
+function buildQueryParams(filters: SalesFilters): Record<string, any> {
+  const params: Record<string, any> = {};
+  if (filters.dateFilterType) params.dateFilterType = filters.dateFilterType;
+  if (filters.specificDate) params.specificDate = filters.specificDate;
+  if (filters.startDate) params.startDate = filters.startDate;
+  if (filters.endDate) params.endDate = filters.endDate;
+  if (filters.sucursal && filters.sucursal !== "all")
+    params.sucursal = filters.sucursal;
+  if (filters.empleadoId && filters.empleadoId !== "all")
+    params.empleadoId = filters.empleadoId;
+  if (filters.metodoPago && filters.metodoPago !== "all")
+    params.metodoPago = filters.metodoPago;
+  if (filters.tipo) params.tipo = filters.tipo;
+  return params;
 }
 
 // ============================================
@@ -232,28 +265,16 @@ const parseDetallePago = (
   }
 
   let efectivo = 0;
-  const efectivoPatterns = [
-    /(?:efectivo|Efectivo)\s*[:=]?\s*(?:Bs\.?)?\s*([\d.,]+)/i,
-  ];
-
-  for (const pattern of efectivoPatterns) {
-    const match = detallePago.match(pattern);
-    if (match) {
-      efectivo = parseFloat(match[1].replace(",", "."));
-      break;
-    }
-  }
+  const eMatch = detallePago.match(
+    /(?:efectivo|Efectivo)\s*[:=]?\s*(?:Bs\.?)?\s*([\d.,]+)/i
+  );
+  if (eMatch) efectivo = parseFloat(eMatch[1].replace(",", ".")) || 0;
 
   let qr = 0;
-  const qrPatterns = [/(?:QR|qr|Q\.R\.)\s*[:=]?\s*(?:Bs\.?)?\s*([\d.,]+)/i];
-
-  for (const pattern of qrPatterns) {
-    const match = detallePago.match(pattern);
-    if (match) {
-      qr = parseFloat(match[1].replace(",", "."));
-      break;
-    }
-  }
+  const qMatch = detallePago.match(
+    /(?:QR|qr|Q\.R\.)\s*[:=]?\s*(?:Bs\.?)?\s*([\d.,]+)/i
+  );
+  if (qMatch) qr = parseFloat(qMatch[1].replace(",", ".")) || 0;
 
   if (formaPago === "mixto" && efectivo === 0 && qr === 0 && total > 0) {
     efectivo = total / 2;
@@ -273,30 +294,13 @@ export const getSales = async (
 ): Promise<SalesResponse> => {
   try {
     const appliedFilters = applyForcedFilters(filters);
-
-    const params: any = {};
-
-    if (appliedFilters.dateFilterType)
-      params.dateFilterType = appliedFilters.dateFilterType;
-    if (appliedFilters.specificDate)
-      params.specificDate = appliedFilters.specificDate;
-    if (appliedFilters.startDate) params.startDate = appliedFilters.startDate;
-    if (appliedFilters.endDate) params.endDate = appliedFilters.endDate;
-    if (appliedFilters.sucursal) params.sucursal = appliedFilters.sucursal;
-    if (appliedFilters.empleadoId)
-      params.empleadoId = appliedFilters.empleadoId;
-
+    const params = buildQueryParams(appliedFilters);
     params.page = page;
     params.pageSize = pageSize;
 
     const response = await api.get<{
       sales: BackendSaleRecord[];
-      pagination: {
-        page: number;
-        pageSize: number;
-        total: number;
-        totalPages: number;
-      };
+      pagination: SalesPagination;
     }>("/sales", { params });
 
     const processedSales = response.data.sales.map(
@@ -354,25 +358,19 @@ export const getSales = async (
       }
     );
 
-    return {
-      sales: processedSales,
-      pagination: response.data.pagination,
-    };
+    return { sales: processedSales, pagination: response.data.pagination };
   } catch (error: any) {
     console.error(
       "❌ Error fetching sales:",
       error.response?.data || error.message
     );
 
-    // ✅ Mensaje claro cuando la sesión expiró
     if (error.response?.status === 401) {
       throw new Error("Tu sesión ha expirado. Inicia sesión nuevamente.");
     }
-
     if (error.response?.status === 400) {
       throw new Error(error.response.data.error || "Parámetros inválidos");
     }
-
     throw new Error(
       error.response?.data?.error || "No se pudieron cargar las ventas"
     );
@@ -387,28 +385,14 @@ export const getTotalSales = async (
 ): Promise<FilterTotals> => {
   try {
     const appliedFilters = applyForcedFilters(filters);
-
-    const params: any = {};
-
-    if (appliedFilters.dateFilterType)
-      params.dateFilterType = appliedFilters.dateFilterType;
-    if (appliedFilters.specificDate)
-      params.specificDate = appliedFilters.specificDate;
-    if (appliedFilters.startDate) params.startDate = appliedFilters.startDate;
-    if (appliedFilters.endDate) params.endDate = appliedFilters.endDate;
-    if (appliedFilters.sucursal) params.sucursal = appliedFilters.sucursal;
-    if (appliedFilters.empleadoId)
-      params.empleadoId = appliedFilters.empleadoId;
-
+    const params = buildQueryParams(appliedFilters);
     const response = await api.get<FilterTotals>("/sales/totals", { params });
-
     return response.data;
   } catch (error: any) {
     console.error(
       "❌ Error fetching totals:",
       error.response?.data || error.message
     );
-
     return {
       totalGeneral: 0,
       efectivoGeneral: 0,
@@ -420,6 +404,30 @@ export const getTotalSales = async (
       efectivoServicios: 0,
       qrServicios: 0,
     };
+  }
+};
+
+// ============================================
+// GET RESUMEN DETALLADO  (nuevo, de Mutant)
+// ============================================
+export const getResumenDetallado = async (
+  filters: SalesFilters = {}
+): Promise<ResumenDetallado> => {
+  try {
+    const appliedFilters = applyForcedFilters(filters);
+    const params = buildQueryParams(appliedFilters);
+    const response = await api.get<ResumenDetallado>("/sales/resumen", {
+      params,
+    });
+    return response.data;
+  } catch (error: any) {
+    console.error(
+      "❌ Error fetching resumen:",
+      error.response?.data || error.message
+    );
+    throw new Error(
+      error.response?.data?.error || "No se pudo cargar el resumen"
+    );
   }
 };
 
@@ -453,24 +461,39 @@ export const getSaleDetails = async (
 export const getSucursales = async (): Promise<Sucursal[]> => {
   try {
     const response = await api.get<Sucursal[]>("/sales/sucursales/list");
-
-    const sucursalesFiltradas = response.data.filter(
-      (sucursal) => sucursal.id !== "all"
-    );
-
-    return [{ id: "all", name: "Todas las sucursales" }, ...sucursalesFiltradas];
+    const filtered = response.data.filter((s) => s.id !== "all");
+    return [{ id: "all", name: "Todas las sucursales" }, ...filtered];
   } catch (error: any) {
     console.error(
       "❌ Error fetching sucursales:",
       error.response?.data || error.message
     );
-
-    // ✅ Mensaje claro cuando la sesión expiró
     if (error.response?.status === 401) {
       throw new Error("Tu sesión ha expirado. Inicia sesión nuevamente.");
     }
-
     throw new Error("No se pudieron cargar las sucursales");
+  }
+};
+
+// ============================================
+// GET EMPLEADOS (solo recepcionistas) — de Mutant
+// ============================================
+export const getEmpleados = async (
+  sucursal?: string
+): Promise<Empleado[]> => {
+  try {
+    const params: Record<string, any> = {};
+    if (sucursal && sucursal !== "all") params.sucursal = sucursal;
+    const response = await api.get<Empleado[]>("/sales/empleados/list", {
+      params,
+    });
+    return response.data;
+  } catch (error: any) {
+    console.error(
+      "❌ Error fetching empleados:",
+      error.response?.data || error.message
+    );
+    throw new Error("No se pudieron cargar los empleados");
   }
 };
 
@@ -482,36 +505,29 @@ export const anularVenta = async (
   saleType: "producto" | "servicio"
 ): Promise<AnularVentaResponse> => {
   try {
-    const response = await api.delete<AnularVentaResponse>(
-      `/sales/${saleId}`,
-      {
-        params: { type: saleType },
-      }
-    );
+    const response = await api.delete<AnularVentaResponse>(`/sales/${saleId}`, {
+      params: { type: saleType },
+    });
     return response.data;
   } catch (error: any) {
     console.error(
       "❌ Error anulando venta:",
       error.response?.data || error.message
     );
-
     if (error.response?.status === 403) {
       throw new Error(
         error.response.data.error ||
           "Solo un administrador puede anular ventas"
       );
     }
-
     if (error.response?.status === 400) {
       throw new Error(
         error.response.data.error || "No se puede anular esta venta"
       );
     }
-
     if (error.response?.status === 404) {
       throw new Error(error.response.data.error || "La venta no existe");
     }
-
     throw new Error(
       error.response?.data?.error || "No se pudo anular la venta"
     );
