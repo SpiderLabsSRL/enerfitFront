@@ -4,70 +4,35 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
+  AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
+  Popover, PopoverContent, PopoverTrigger,
 } from "@/components/ui/popover";
 import {
-  Search,
-  Plus,
-  User,
-  Bell,
-  AlertTriangle,
-  Fingerprint,
-  Eye,
-  RefreshCw,
-  ChevronLeft,
-  ChevronRight,
-  Calendar,
-  CalendarIcon,
-  X,
+  Search, Plus, User, Bell, AlertTriangle, Fingerprint, Eye, RefreshCw,
+  ChevronLeft, ChevronRight, Calendar, CalendarIcon, X,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import * as AccessApi from "@/api/AccessApi";
 import {
-  AccessLog,
-  ApiMember,
-  ClientAccessResponse,
-  formatLocalYMD,
-  parseLocalYMD,
+  AccessLog, ApiMember, ClientAccessResponse, formatLocalYMD, parseLocalYMD,
 } from "@/api/AccessApi";
 import { useUser } from "@/contexts/UserContext";
 import { useRealtimeAccessLogs } from "@/hooks/useRealtimeAccessLogs";
-import { useFingerprintIdentify } from "@/hooks/useFingerprintIdentify";
 import { MemberSubscriptionDetails } from "./MemberSubscriptionDetails";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 
 const PAGE_SIZE = 50;
 
-// ============================================
-// Tipos de modo de filtro por fecha
-// ============================================
 type DateFilterMode = "today" | "yesterday" | "last7" | "specific" | "range";
 
 const DATE_MODE_LABELS: Record<DateFilterMode, string> = {
@@ -78,9 +43,6 @@ const DATE_MODE_LABELS: Record<DateFilterMode, string> = {
   range: "Rango de fechas",
 };
 
-// ============================================
-// CALENDARIO SIMPLE (idéntico a SalesControl)
-// ============================================
 function SimpleCalendar({
   selected,
   onSelect,
@@ -90,18 +52,8 @@ function SimpleCalendar({
 }) {
   const [currentDate, setCurrentDate] = useState(selected || new Date());
   const months = [
-    "Enero",
-    "Febrero",
-    "Marzo",
-    "Abril",
-    "Mayo",
-    "Junio",
-    "Julio",
-    "Agosto",
-    "Septiembre",
-    "Octubre",
-    "Noviembre",
-    "Diciembre",
+    "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+    "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
   ];
   const weekDays = ["Do", "Lu", "Ma", "Mi", "Ju", "Vi", "Sa"];
 
@@ -111,13 +63,9 @@ function SimpleCalendar({
     new Date(date.getFullYear(), date.getMonth(), 1).getDay();
 
   const handlePrevMonth = () =>
-    setCurrentDate(
-      new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1)
-    );
+    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
   const handleNextMonth = () =>
-    setCurrentDate(
-      new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1)
-    );
+    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
 
   const daysInMonth = getDaysInMonth(currentDate);
   const firstDay = getFirstDayOfMonth(currentDate);
@@ -138,21 +86,15 @@ function SimpleCalendar({
   return (
     <div className="p-3 w-[280px] max-w-[90vw]">
       <div className="flex items-center justify-between mb-4">
-        <Button variant="outline" size="sm" onClick={handlePrevMonth}>
-          {"<"}
-        </Button>
+        <Button variant="outline" size="sm" onClick={handlePrevMonth}>{"<"}</Button>
         <span className="font-medium text-sm">
           {months[currentDate.getMonth()]} {currentDate.getFullYear()}
         </span>
-        <Button variant="outline" size="sm" onClick={handleNextMonth}>
-          {">"}
-        </Button>
+        <Button variant="outline" size="sm" onClick={handleNextMonth}>{">"}</Button>
       </div>
       <div className="grid grid-cols-7 gap-1 text-center mb-2">
         {weekDays.map((day) => (
-          <div key={day} className="text-xs font-medium text-muted-foreground">
-            {day}
-          </div>
+          <div key={day} className="text-xs font-medium text-muted-foreground">{day}</div>
         ))}
       </div>
       <div className="grid grid-cols-7 gap-1">
@@ -164,17 +106,10 @@ function SimpleCalendar({
                 size="sm"
                 className={cn(
                   "h-8 w-8 p-0 font-normal",
-                  isSelectedDate(day) &&
-                    "bg-primary text-black hover:bg-primary/90"
+                  isSelectedDate(day) && "bg-primary text-black hover:bg-primary/90"
                 )}
                 onClick={() =>
-                  onSelect(
-                    new Date(
-                      currentDate.getFullYear(),
-                      currentDate.getMonth(),
-                      day
-                    )
-                  )
+                  onSelect(new Date(currentDate.getFullYear(), currentDate.getMonth(), day))
                 }
               >
                 {day}
@@ -191,17 +126,12 @@ function SimpleCalendar({
 
 export function AccessControlAdmin() {
   const [searchTerm, setSearchTerm] = useState("");
-  const [typeFilter, setTypeFilter] = useState<"all" | "client" | "employee">(
-    "all",
-  );
+  const [typeFilter, setTypeFilter] = useState<"all" | "client" | "employee">("all");
   const [accessLogs, setAccessLogs] = useState<AccessLog[]>([]);
   const [members, setMembers] = useState<ApiMember[]>([]);
   const [selectedMember, setSelectedMember] = useState<ApiMember | null>(null);
-  const [isFingerReaded, setIsFingerReaded] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [loadingButtons, setLoadingButtons] = useState<Record<string, boolean>>(
-    {},
-  );
+  const [loadingButtons, setLoadingButtons] = useState<Record<string, boolean>>({});
   const [showDeudaDialog, setShowDeudaDialog] = useState(false);
   const [deudaInfo, setDeudaInfo] = useState<{
     memberName: string;
@@ -212,53 +142,38 @@ export function AccessControlAdmin() {
   const [selectedMemberForDetails, setSelectedMemberForDetails] =
     useState<ApiMember | null>(null);
 
-  // ============================================
-  // Selección de servicio tras huella (2+ servicios)
-  // ============================================
-  const [fingerprintSelection, setFingerprintSelection] = useState<{
-    memberId: string;
-    memberName: string;
-    ci: string;
-    services: AccessApi.FingerprintServiceOption[];
-  } | null>(null);
-  const [fingerprintProcessing, setFingerprintProcessing] = useState(false);
+  const [successHighlightIds, setSuccessHighlightIds] = useState<Set<string>>(new Set());
+  const highlightTimeoutsRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
-  const [successHighlightIds, setSuccessHighlightIds] = useState<Set<string>>(
-    new Set(),
-  );
-  const highlightTimeoutsRef = useRef<
-    Record<string, ReturnType<typeof setTimeout>>
-  >({});
-
-  // ============================================
-  // Buscador discreto de registros (lupa)
-  // ============================================
   const [showLogSearch, setShowLogSearch] = useState(false);
   const [logSearchTerm, setLogSearchTerm] = useState("");
   const logSearchInputRef = useRef<HTMLInputElement | null>(null);
 
-  // ============================================
-  // Filtro por fechas - Modo explícito
-  // ============================================
   const [dateMode, setDateMode] = useState<DateFilterMode>("today");
   const [specificDate, setSpecificDate] = useState<string>("");
   const [rangeStart, setRangeStart] = useState<string>("");
   const [rangeEnd, setRangeEnd] = useState<string>("");
   const [showDateFilter, setShowDateFilter] = useState(false);
 
-  // ============================================
-  // Paginación
-  // ============================================
   const [currentPage, setCurrentPage] = useState(1);
 
   const { user } = useUser();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // ✅ NUEVO: si venimos del toast "Múltiples servicios" del layout, aplicar ?search=CI
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const searchCi = params.get("search");
+    if (searchCi) {
+      setSearchTerm(searchCi);
+      navigate(location.pathname, { replace: true });
+    }
+  }, [location.search, navigate, location.pathname]);
 
   useEffect(() => {
     if (user && !user.idsucursal) {
-      console.warn(
-        "⚠️ Usuario sin idsucursal - los filtros por sucursal no funcionarán"
-      );
+      console.warn("⚠️ Usuario sin idsucursal - los filtros por sucursal no funcionarán");
       toast({
         title: "Advertencia",
         description:
@@ -272,16 +187,11 @@ export function AccessControlAdmin() {
 
   const allLogs = [
     ...newLogs,
-    ...accessLogs.filter(
-      (log) => !newLogs.some((newLog) => newLog.id === log.id),
-    ),
+    ...accessLogs.filter((log) => !newLogs.some((newLog) => newLog.id === log.id)),
   ];
 
   const mostRecentLogId = allLogs.length > 0 ? allLogs[0].id : null;
 
-  // ============================================
-  // Filtrado por búsqueda de logs (frontend)
-  // ============================================
   const filteredLogs = useMemo(() => {
     const rawTerm = logSearchTerm.trim().toLowerCase();
     if (!rawTerm) return allLogs;
@@ -305,13 +215,7 @@ export function AccessControlAdmin() {
     });
   }, [allLogs, logSearchTerm]);
 
-  // ============================================
-  // Paginación
-  // ============================================
-  const totalPages = Math.max(
-    1,
-    Math.ceil(filteredLogs.length / PAGE_SIZE),
-  );
+  const totalPages = Math.max(1, Math.ceil(filteredLogs.length / PAGE_SIZE));
 
   useEffect(() => {
     setCurrentPage(1);
@@ -333,9 +237,7 @@ export function AccessControlAdmin() {
 
   useEffect(() => {
     return () => {
-      Object.values(highlightTimeoutsRef.current).forEach((t) =>
-        clearTimeout(t),
-      );
+      Object.values(highlightTimeoutsRef.current).forEach((t) => clearTimeout(t));
     };
   }, []);
 
@@ -347,9 +249,6 @@ export function AccessControlAdmin() {
     }
   }, [showLogSearch]);
 
-  // ============================================
-  // Helpers de fecha
-  // ============================================
   const getTodayYMD = () => {
     const d = new Date();
     const y = d.getFullYear();
@@ -382,9 +281,6 @@ export function AccessControlAdmin() {
     return { start: fmt(start), end: fmt(end) };
   };
 
-  // ============================================
-  // Calcular rango real según el modo
-  // ============================================
   const getEffectiveDateRange = (
     mode: DateFilterMode,
     specific: string,
@@ -418,17 +314,8 @@ export function AccessControlAdmin() {
     }
   };
 
-  // ============================================
-  // Cargar logs (depende del modo de fecha + searchTerm)
-  // ============================================
   const loadAccessLogs = async () => {
-    const effective = getEffectiveDateRange(
-      dateMode,
-      specificDate,
-      rangeStart,
-      rangeEnd
-    );
-
+    const effective = getEffectiveDateRange(dateMode, specificDate, rangeStart, rangeEnd);
     if (!effective.valid) {
       setAccessLogs([]);
       return;
@@ -442,7 +329,6 @@ export function AccessControlAdmin() {
         branchId: user?.idsucursal,
         startDate: effective.startDate,
         endDate: effective.endDate,
-        // Búsqueda por nombre/CI dentro del rango seleccionado
         searchTerm: searchTerm.trim() || undefined,
       });
       setAccessLogs(logs);
@@ -458,13 +344,11 @@ export function AccessControlAdmin() {
     }
   };
 
-  // Recargar cuando cambia el modo o las fechas
   useEffect(() => {
     loadAccessLogs();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dateMode, specificDate, rangeStart, rangeEnd]);
 
-  // Debounce para búsqueda por nombre en logs
   useEffect(() => {
     const t = setTimeout(() => {
       loadAccessLogs();
@@ -473,7 +357,6 @@ export function AccessControlAdmin() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchTerm]);
 
-  // Resetear página cuando cambia el modo de fecha
   useEffect(() => {
     setCurrentPage(1);
   }, [dateMode, specificDate, rangeStart, rangeEnd]);
@@ -487,12 +370,7 @@ export function AccessControlAdmin() {
           typeFilter,
           user?.idsucursal,
         );
-
         setMembers(foundMembers);
-
-        if (isFingerReaded && foundMembers.length > 0) {
-          selectDefaultService(foundMembers);
-        }
       } catch (error: any) {
         toast({
           title: "Error",
@@ -507,207 +385,17 @@ export function AccessControlAdmin() {
     }
   };
 
-  const selectDefaultService = (foundMembers: ApiMember[]) => {
-    if (foundMembers.length === 1) {
-      const member = foundMembers[0];
-      switch (member.memberType) {
-        case "client":
-          if (member.services.length === 1)
-            handleRegisterAccess(member, member.services[0]);
-          break;
-        case "employee":
-          if (member.employeeInfo?.status === "in")
-            handleEmployeeCheckOut(member);
-          else if (member.employeeInfo?.status === "out")
-            handleEmployeeCheckIn(member);
-          break;
-        default:
-          console.log("tipo de usuario desconocido");
-          break;
-      }
-    }
-    setIsFingerReaded(false);
-  };
-
   useEffect(() => {
     if (!user?.idsucursal) {
       console.warn("Sin sucursal, no se busca");
       return;
     }
-    if (isFingerReaded || fingerprintProcessing || fingerprintSelection) return;
-
     const delayDebounce = setTimeout(() => {
       searchMembers();
     }, 300);
-
     return () => clearTimeout(delayDebounce);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchTerm, typeFilter, user?.idsucursal, isFingerReaded, fingerprintProcessing, fingerprintSelection]);
-
-  // ============================================
-  // HUELLA → registro directo en backend
-  // ============================================
-  useFingerprintIdentify({
-    onVerified: async (ci) => {
-      if (!user?.idsucursal || !user?.idusuario) {
-        toast({
-          title: "Error",
-          description: "Usuario o sucursal no identificados",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      setFingerprintProcessing(true);
-      setIsFingerReaded(true);
-      setMembers([]);
-
-      try {
-        const res = await AccessApi.registerByFingerprint(
-          ci,
-          user.idsucursal,
-          user.idusuario
-        );
-
-        if (res.log) {
-          prependLog(res.log);
-        }
-
-        switch (res.mode) {
-          case "client_auto":
-          case "employee": {
-            if (res.denied) {
-              toast({
-                title: "Acceso Denegado",
-                description: res.message,
-                variant: "destructive",
-              });
-            } else {
-              toast({
-                title:
-                  res.mode === "employee"
-                    ? res.isLate
-                      ? "Entrada Tardía"
-                      : "Registro de Empleado"
-                    : "Acceso Registrado",
-                description: res.message,
-                variant: res.isLate ? "destructive" : "default",
-              });
-            }
-
-            if (res.tieneDeuda && res.deudaInfo) {
-              setDeudaInfo({
-                memberName: res.memberName || "Cliente",
-                montoPendiente: res.deudaInfo.montoPendiente,
-                servicioNombre: res.deudaInfo.servicioNombre,
-              });
-              setTimeout(() => setShowDeudaDialog(true), 500);
-            }
-            break;
-          }
-
-          case "requires_selection": {
-            if (res.services && res.services.length > 1) {
-              setFingerprintSelection({
-                memberId: res.memberId!,
-                memberName: res.memberName || "",
-                ci: res.ci || ci,
-                services: res.services,
-              });
-              toast({
-                title: "Seleccione un servicio",
-                description: res.message,
-              });
-            }
-            break;
-          }
-
-          case "denied":
-          case "not_found":
-          default: {
-            toast({
-              title:
-                res.mode === "not_found"
-                  ? "No encontrado"
-                  : "Acceso Denegado",
-              description: res.message,
-              variant: "destructive",
-            });
-          }
-        }
-      } catch (error: any) {
-        toast({
-          title: "Error",
-          description: error.message,
-          variant: "destructive",
-        });
-      } finally {
-        setFingerprintProcessing(false);
-        setIsFingerReaded(false);
-        setSearchTerm("");
-      }
-    },
-  });
-
-  // ============================================
-  // Selección manual de servicio tras huella
-  // ============================================
-  const handleFingerprintServicePick = async (
-    service: AccessApi.FingerprintServiceOption
-  ) => {
-    if (!fingerprintSelection || !user?.idsucursal || !user?.idusuario) return;
-
-    const buttonId = `fingerprint-${fingerprintSelection.memberId}-${service.id}`;
-    if (isButtonLoading(buttonId)) return;
-
-    try {
-      startButtonLoading(buttonId);
-
-      const result: ClientAccessResponse =
-        await AccessApi.registerClientAccess(
-          parseInt(fingerprintSelection.memberId),
-          parseInt(service.id),
-          user.idsucursal,
-          user.idusuario
-        );
-
-      if (result.success) {
-        toast({
-          title: "Acceso Registrado",
-          description: `${fingerprintSelection.memberName} - ${service.name}. ${result.message}`,
-        });
-
-        if (result.tieneDeuda && result.deudaInfo) {
-          setDeudaInfo({
-            memberName: fingerprintSelection.memberName,
-            montoPendiente: result.deudaInfo.montoPendiente,
-            servicioNombre: result.deudaInfo.servicioNombre,
-          });
-          setTimeout(() => setShowDeudaDialog(true), 500);
-        }
-      } else {
-        toast({
-          title: "Acceso Denegado",
-          description: result.message,
-          variant: "destructive",
-        });
-      }
-
-      if (result.log) {
-        prependLog(result.log);
-      }
-
-      setFingerprintSelection(null);
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    } finally {
-      stopButtonLoading(buttonId);
-    }
-  };
+  }, [searchTerm, typeFilter, user?.idsucursal]);
 
   const startButtonLoading = (buttonId: string) => {
     setLoadingButtons((prev) => ({ ...prev, [buttonId]: true }));
@@ -723,11 +411,9 @@ export function AccessControlAdmin() {
 
   const highlightSuccessLog = (logId: string) => {
     setSuccessHighlightIds((prev) => new Set(prev).add(logId));
-
     if (highlightTimeoutsRef.current[logId]) {
       clearTimeout(highlightTimeoutsRef.current[logId]);
     }
-
     highlightTimeoutsRef.current[logId] = setTimeout(() => {
       setSuccessHighlightIds((prev) => {
         const next = new Set(prev);
@@ -743,7 +429,6 @@ export function AccessControlAdmin() {
       if (prev.some((l) => l.id === log.id)) return prev;
       return [log, ...prev];
     });
-
     if (log.status === "success") {
       highlightSuccessLog(log.id);
     }
@@ -751,16 +436,13 @@ export function AccessControlAdmin() {
 
   const handleEmployeeCheckIn = async (member: ApiMember) => {
     if (!member.employeeInfo) return;
-
     const buttonId = `checkin-${member.id}`;
-
     if (isButtonLoading(buttonId)) return;
 
     try {
       startButtonLoading(buttonId);
       const branchId = user?.idsucursal;
       const userId = user?.idusuario;
-
       if (!branchId || !userId) {
         throw new Error("No se pudo identificar la sucursal o usuario");
       }
@@ -777,11 +459,7 @@ export function AccessControlAdmin() {
           description: `${member.name} - ${result.message}`,
           variant: "destructive",
         });
-
-        if (result.log) {
-          prependLog(result.log);
-        }
-
+        if (result.log) prependLog(result.log);
         setSelectedMember(null);
         setSearchTerm("");
         return;
@@ -823,16 +501,13 @@ export function AccessControlAdmin() {
 
   const handleEmployeeCheckOut = async (member: ApiMember) => {
     if (!member.employeeInfo) return;
-
     const buttonId = `checkout-${member.id}`;
-
     if (isButtonLoading(buttonId)) return;
 
     try {
       startButtonLoading(buttonId);
       const branchId = user?.idsucursal;
       const userId = user?.idusuario;
-
       if (!branchId || !userId) {
         throw new Error("No se pudo identificar la sucursal o usuario");
       }
@@ -849,11 +524,7 @@ export function AccessControlAdmin() {
           description: `${member.name} - ${result.message}`,
           variant: "destructive",
         });
-
-        if (result.log) {
-          prependLog(result.log);
-        }
-
+        if (result.log) prependLog(result.log);
         setSelectedMember(null);
         setSearchTerm("");
         return;
@@ -904,25 +575,22 @@ export function AccessControlAdmin() {
       }
 
       const buttonId = `access-${member.id}-${service.id}`;
-
       if (isButtonLoading(buttonId)) return;
 
       try {
         startButtonLoading(buttonId);
         const branchId = user?.idsucursal;
         const userId = user?.idusuario;
-
         if (!branchId || !userId) {
           throw new Error("No se pudo identificar la sucursal o usuario");
         }
 
-        const result: ClientAccessResponse =
-          await AccessApi.registerClientAccess(
-            parseInt(member.id),
-            parseInt(service.id),
-            branchId,
-            userId,
-          );
+        const result: ClientAccessResponse = await AccessApi.registerClientAccess(
+          parseInt(member.id),
+          parseInt(service.id),
+          branchId,
+          userId,
+        );
 
         if (result.success) {
           setMembers((prev) =>
@@ -951,9 +619,7 @@ export function AccessControlAdmin() {
               montoPendiente: result.deudaInfo.montoPendiente,
               servicioNombre: result.deudaInfo.servicioNombre,
             });
-            setTimeout(() => {
-              setShowDeudaDialog(true);
-            }, 500);
+            setTimeout(() => setShowDeudaDialog(true), 500);
           }
         } else {
           toast({
@@ -963,9 +629,7 @@ export function AccessControlAdmin() {
           });
         }
 
-        if (result.log) {
-          prependLog(result.log);
-        }
+        if (result.log) prependLog(result.log);
       } catch (error: any) {
         toast({
           title: "Error",
@@ -989,9 +653,7 @@ export function AccessControlAdmin() {
   };
 
   const displayVisits = (service: any) => {
-    if (service.visits === null) {
-      return "Ilimitado";
-    }
+    if (service.visits === null) return "Ilimitado";
     return service.visits;
   };
 
@@ -1073,23 +735,16 @@ export function AccessControlAdmin() {
   useEffect(() => {
     if (newLogs.length > 0) {
       newLogs.forEach((log) => {
-        if (log.status === "success") {
-          highlightSuccessLog(log.id);
-        }
+        if (log.status === "success") highlightSuccessLog(log.id);
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [newLogs]);
 
-  // ============================================
-  // Label dinámico del filtro de fechas
-  // ============================================
   const dateFilterLabel = useMemo(() => {
     switch (dateMode) {
-      case "today":
-        return "Hoy";
-      case "yesterday":
-        return "Ayer";
+      case "today": return "Hoy";
+      case "yesterday": return "Ayer";
       case "last7": {
         const { start, end } = getLast7Range();
         return `${formatLocalYMD(start)} → ${formatLocalYMD(end)}`;
@@ -1102,14 +757,10 @@ export function AccessControlAdmin() {
         if (!rangeStart || !rangeEnd) return "Rango de fechas";
         return `${formatLocalYMD(rangeStart)} → ${formatLocalYMD(rangeEnd)}`;
       }
-      default:
-        return "Hoy";
+      default: return "Hoy";
     }
   }, [dateMode, specificDate, rangeStart, rangeEnd]);
 
-  // ============================================
-  // Validación del modo activo
-  // ============================================
   const isDateModeValid = useMemo(() => {
     if (dateMode === "specific") return Boolean(specificDate);
     if (dateMode === "range")
@@ -1117,9 +768,6 @@ export function AccessControlAdmin() {
     return true;
   }, [dateMode, specificDate, rangeStart, rangeEnd]);
 
-  // ============================================
-  // Cambio de modo
-  // ============================================
   const handleDateModeChange = (mode: DateFilterMode) => {
     setDateMode(mode);
   };
@@ -1151,7 +799,6 @@ export function AccessControlAdmin() {
           </CardTitle>
         </CardHeader>
         <CardContent className="px-3 md:px-6">
-          {/* Filtros - Responsive */}
           <div className="flex flex-col gap-3 mb-4 md:mb-6">
             <div className="relative w-full">
               <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
@@ -1192,7 +839,6 @@ export function AccessControlAdmin() {
               </div>
 
               <div className="flex items-center gap-1.5 flex-wrap">
-                {/* Botón de filtro por fechas */}
                 <Button
                   variant={showDateFilter ? "default" : "outline"}
                   size="sm"
@@ -1201,15 +847,12 @@ export function AccessControlAdmin() {
                   title="Filtrar por fechas"
                 >
                   <Calendar className="h-3.5 w-3.5 sm:mr-1" />
-                  <span className="hidden sm:inline text-xs">
-                    {dateFilterLabel}
-                  </span>
+                  <span className="hidden sm:inline text-xs">{dateFilterLabel}</span>
                   {dateMode !== "today" && (
                     <span className="sm:hidden text-xs ml-1">•</span>
                   )}
                 </Button>
 
-                {/* Botón de búsqueda en logs */}
                 <Button
                   variant={showLogSearch ? "default" : "outline"}
                   size="sm"
@@ -1247,7 +890,6 @@ export function AccessControlAdmin() {
               </div>
             </div>
 
-            {/* Panel de filtro por fechas - Select + calendario bonito (Popover) */}
             {showDateFilter && (
               <div className="w-full p-3 border rounded-lg bg-muted/30 space-y-3">
                 <div className="flex items-center justify-between">
@@ -1265,14 +907,11 @@ export function AccessControlAdmin() {
                   </Button>
                 </div>
 
-                {/* Select de modo + calendario al lado */}
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                   <div className="sm:w-[200px] flex-shrink-0">
                     <Select
                       value={dateMode}
-                      onValueChange={(v) =>
-                        handleDateModeChange(v as DateFilterMode)
-                      }
+                      onValueChange={(v) => handleDateModeChange(v as DateFilterMode)}
                     >
                       <SelectTrigger className="h-9 text-sm">
                         <SelectValue placeholder="Seleccione un rango" />
@@ -1312,7 +951,6 @@ export function AccessControlAdmin() {
                     </Select>
                   </div>
 
-                  {/* Fecha específica - Popover con calendario bonito */}
                   {dateMode === "specific" && (
                     <div className="flex-shrink-0">
                       <Popover>
@@ -1338,10 +976,7 @@ export function AccessControlAdmin() {
                             }
                             onSelect={(d) => {
                               const y = d.getFullYear();
-                              const m = String(d.getMonth() + 1).padStart(
-                                2,
-                                "0"
-                              );
+                              const m = String(d.getMonth() + 1).padStart(2, "0");
                               const day = String(d.getDate()).padStart(2, "0");
                               setSpecificDate(`${y}-${m}-${day}`);
                             }}
@@ -1351,7 +986,6 @@ export function AccessControlAdmin() {
                     </div>
                   )}
 
-                  {/* Rango - dos Popover con calendario bonito */}
                   {dateMode === "range" && (
                     <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                       <div className="flex-shrink-0">
@@ -1369,10 +1003,7 @@ export function AccessControlAdmin() {
                               </span>
                             </Button>
                           </PopoverTrigger>
-                          <PopoverContent
-                            className="w-auto p-0"
-                            align="start"
-                          >
+                          <PopoverContent className="w-auto p-0" align="start">
                             <SimpleCalendar
                               selected={
                                 rangeStart
@@ -1381,14 +1012,8 @@ export function AccessControlAdmin() {
                               }
                               onSelect={(d) => {
                                 const y = d.getFullYear();
-                                const m = String(d.getMonth() + 1).padStart(
-                                  2,
-                                  "0"
-                                );
-                                const day = String(d.getDate()).padStart(
-                                  2,
-                                  "0"
-                                );
+                                const m = String(d.getMonth() + 1).padStart(2, "0");
+                                const day = String(d.getDate()).padStart(2, "0");
                                 setRangeStart(`${y}-${m}-${day}`);
                               }}
                             />
@@ -1410,10 +1035,7 @@ export function AccessControlAdmin() {
                               </span>
                             </Button>
                           </PopoverTrigger>
-                          <PopoverContent
-                            className="w-auto p-0"
-                            align="start"
-                          >
+                          <PopoverContent className="w-auto p-0" align="start">
                             <SimpleCalendar
                               selected={
                                 rangeEnd
@@ -1422,14 +1044,8 @@ export function AccessControlAdmin() {
                               }
                               onSelect={(d) => {
                                 const y = d.getFullYear();
-                                const m = String(d.getMonth() + 1).padStart(
-                                  2,
-                                  "0"
-                                );
-                                const day = String(d.getDate()).padStart(
-                                  2,
-                                  "0"
-                                );
+                                const m = String(d.getMonth() + 1).padStart(2, "0");
+                                const day = String(d.getDate()).padStart(2, "0");
                                 setRangeEnd(`${y}-${m}-${day}`);
                               }}
                             />
@@ -1440,7 +1056,6 @@ export function AccessControlAdmin() {
                   )}
                 </div>
 
-                {/* Mensajes de validación */}
                 {dateMode === "specific" && !specificDate && (
                   <p className="text-[11px] text-amber-600 flex items-center gap-1">
                     <AlertTriangle className="h-3 w-3" />
@@ -1465,7 +1080,6 @@ export function AccessControlAdmin() {
                     </p>
                   )}
 
-                {/* Resumen del filtro activo */}
                 <div className="pt-2 border-t flex items-center justify-between gap-2">
                   <span className="text-xs text-muted-foreground truncate">
                     Mostrando:{" "}
@@ -1485,73 +1099,13 @@ export function AccessControlAdmin() {
                     variant={isDateModeValid ? "default" : "destructive"}
                     className="text-[10px] flex-shrink-0"
                   >
-                    {isDateModeValid
-                      ? DATE_MODE_LABELS[dateMode]
-                      : "Incompleto"}
+                    {isDateModeValid ? DATE_MODE_LABELS[dateMode] : "Incompleto"}
                   </Badge>
                 </div>
               </div>
             )}
           </div>
 
-          {/* HUELLA EN PROCESO */}
-          {fingerprintProcessing && (
-            <div className="mb-4 md:mb-6 p-3 md:p-4 border rounded-lg bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800 flex items-center gap-3">
-              <Fingerprint className="h-5 w-5 text-blue-600 animate-pulse flex-shrink-0" />
-              <div className="text-sm text-blue-800 dark:text-blue-200">
-                <strong>Huella detectada</strong> — registrando acceso...
-              </div>
-            </div>
-          )}
-
-          {/* SELECCIÓN DE SERVICIO TRAS HUELLA (2+ servicios) */}
-          {fingerprintSelection && (
-            <div className="mb-4 md:mb-6 p-3 md:p-4 border-2 border-amber-300 dark:border-amber-700 rounded-lg bg-amber-50 dark:bg-amber-950/30">
-              <h3 className="text-sm font-semibold mb-3 flex items-center gap-2 text-amber-800 dark:text-amber-200">
-                <Fingerprint className="h-4 w-4" />
-                {fingerprintSelection.memberName} — Seleccione un servicio
-              </h3>
-              <div className="flex flex-wrap gap-2">
-                {fingerprintSelection.services.map((service) => {
-                  const buttonId = `fingerprint-${fingerprintSelection.memberId}-${service.id}`;
-                  const loading = isButtonLoading(buttonId);
-                  const expired = service.status === "expired";
-
-                  return (
-                    <Button
-                      key={service.id}
-                      size="sm"
-                      onClick={() => handleFingerprintServicePick(service)}
-                      disabled={loading}
-                      className={`text-xs ${
-                        expired
-                          ? "bg-rose-600 hover:bg-rose-700 text-white"
-                          : "bg-amber-500 hover:bg-amber-600 text-black"
-                      }`}
-                    >
-                      <Plus className="h-3 w-3 mr-1" />
-                      {loading
-                        ? "Procesando..."
-                        : `${service.name} (${
-                            service.visits === null ? "Ilimitado" : service.visits
-                          })${expired ? " (Vencido)" : ""}`}
-                    </Button>
-                  );
-                })}
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setFingerprintSelection(null)}
-                  disabled={Object.values(loadingButtons).some(Boolean)}
-                  className="text-xs"
-                >
-                  Cancelar
-                </Button>
-              </div>
-            </div>
-          )}
-
-          {/* Nota: empleados solo por huella */}
           {members.some((member) => member.memberType === "employee") && (
             <div className="mb-3 md:mb-4 p-2.5 md:p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs md:text-sm text-blue-700">
               <div className="flex items-start gap-2">
@@ -1564,7 +1118,6 @@ export function AccessControlAdmin() {
             </div>
           )}
 
-          {/* Miembros encontrados */}
           {members.length > 0 && (
             <div className="mb-4 md:mb-6 p-3 md:p-4 border rounded-lg bg-muted/50">
               <h3 className="text-sm font-medium mb-3 flex items-center gap-2">
@@ -1670,9 +1223,7 @@ export function AccessControlAdmin() {
                                         : "bg-yellow-500 hover:bg-yellow-600 text-black"
                                     }`}
                                     variant="default"
-                                    onClick={() =>
-                                      handleRegisterAccess(member, service)
-                                    }
+                                    onClick={() => handleRegisterAccess(member, service)}
                                     disabled={isLoading}
                                   >
                                     <Plus className="h-3 w-3 mr-1" />
@@ -1738,17 +1289,12 @@ export function AccessControlAdmin() {
             </div>
           )}
 
-          {searchTerm.length > 0 &&
-            members.length === 0 &&
-            !isLoading &&
-            !fingerprintProcessing &&
-            !fingerprintSelection && (
-              <div className="mb-4 md:mb-6 p-4 border rounded-lg bg-muted/50 text-center text-sm text-muted-foreground">
-                No se encontraron miembros con ese nombre o CI
-              </div>
-            )}
+          {searchTerm.length > 0 && members.length === 0 && !isLoading && (
+            <div className="mb-4 md:mb-6 p-4 border rounded-lg bg-muted/50 text-center text-sm text-muted-foreground">
+              No se encontraron miembros con ese nombre o CI
+            </div>
+          )}
 
-          {/* Tabla Desktop / Cards Mobile */}
           <div className="rounded-md border">
             <div className="hidden md:block overflow-x-auto">
               <Table>
@@ -1764,10 +1310,7 @@ export function AccessControlAdmin() {
                 <TableBody>
                   {!isDateModeValid ? (
                     <TableRow>
-                      <TableCell
-                        colSpan={5}
-                        className="text-center py-4 text-amber-600"
-                      >
+                      <TableCell colSpan={5} className="text-center py-4 text-amber-600">
                         Complete la fecha o el rango para ver los registros
                       </TableCell>
                     </TableRow>
@@ -1831,14 +1374,10 @@ export function AccessControlAdmin() {
                           <TableCell>
                             <Badge
                               variant={
-                                log.memberType === "client"
-                                  ? "default"
-                                  : "secondary"
+                                log.memberType === "client" ? "default" : "secondary"
                               }
                             >
-                              {log.memberType === "client"
-                                ? "Cliente"
-                                : "Empleado"}
+                              {log.memberType === "client" ? "Cliente" : "Empleado"}
                             </Badge>
                           </TableCell>
                           <TableCell
@@ -1856,9 +1395,7 @@ export function AccessControlAdmin() {
                             <div className="flex items-center gap-2">
                               <Badge
                                 variant={
-                                  log.status === "success"
-                                    ? "default"
-                                    : "destructive"
+                                  log.status === "success" ? "default" : "destructive"
                                 }
                                 className={
                                   log.status === "denied"
@@ -1866,9 +1403,7 @@ export function AccessControlAdmin() {
                                     : ""
                                 }
                               >
-                                {log.status === "success"
-                                  ? "Exitoso"
-                                  : "Rechazado"}
+                                {log.status === "success" ? "Exitoso" : "Rechazado"}
                               </Badge>
                               {log.memberType === "client" && (
                                 <button
@@ -2045,9 +1580,7 @@ export function AccessControlAdmin() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() =>
-                    setCurrentPage((p) => Math.min(totalPages, p + 1))
-                  }
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                   disabled={currentPage === totalPages}
                   className="h-8"
                 >

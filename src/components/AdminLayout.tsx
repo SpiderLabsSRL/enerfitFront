@@ -5,7 +5,6 @@ import {
   Users,
   UserPlus,
   Dumbbell,
-  MessageSquare,
   Package,
   ShoppingCart,
   CreditCard,
@@ -22,19 +21,13 @@ import {
   PieChart,
   Briefcase,
   Ticket,
-  Send,
-  ArrowLeft,
   ChevronDown,
   KeyRound,
-  MapPin,
-  Image,
-  LayoutDashboard,
-  ChevronRight,
-  ChevronLeft,
   PanelLeftClose,
   PanelLeftOpen,
   Award,
   Bell,
+  RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -42,7 +35,6 @@ import { useUser } from "@/contexts/UserContext";
 import { toast } from "@/hooks/use-toast";
 import { useFingerprintIdentify } from "@/hooks/useFingerprintIdentify";
 import * as AccessApi from "@/api/AccessApi";
-import { ApiMember } from "@/api/AccessApi";
 import mutantLogo from "@/assets/mutant-logo.png";
 import { ChangePasswordDialog } from "@/components/ChangePasswordDialog";
 import { SellProducts } from "@/pages/admin/SellProducts";
@@ -56,261 +48,31 @@ interface SidebarItem {
 }
 
 const mainSidebarItems: SidebarItem[] = [
-  {
-    title: "Control de Ventas",
-    icon: CreditCard,
-    path: "/admin/sales",
-    roles: ["recepcionista", "admin"],
-  },
-  {
-    title: "Caja",
-    icon: Wallet,
-    path: "/admin/cash",
-    roles: ["admin"],
-  },
-  {
-    title: "Servicios",
-    icon: Dumbbell,
-    path: "/admin/services",
-    roles: ["admin"],
-  },
-  {
-    title: "Productos",
-    icon: Package,
-    path: "/admin/products",
-    roles: ["recepcionista", "admin"],
-  },
-  {
-    title: "Cupones",
-    icon: Ticket,
-    path: "/admin/cupones",
-    roles: ["admin"],
-  },
-  {
-    title: "Lista de Miembros",
-    icon: Users,
-    path: "/admin/members",
-    roles: ["recepcionista", "admin"],
-  },
-  {
-    title: "Gestión de Trabajadores",
-    icon: UserCog,
-    path: "/admin/employees",
-    roles: ["admin"],
-  },
-  {
-    title: "Coaches",
-    icon: Award,
-    path: "/admin/coaches",
-    roles: ["admin"],
-  },
-  {
-    title: "Reportes",
-    icon: TrendingUp,
-    path: "/admin/reports",
-    roles: ["admin"],
-  },
-  // ✅ NUEVO: Recordatorios en el menú principal del admin
-  {
-    title: "Recordatorios",
-    icon: Bell,
-    path: "/admin/reminders",
-    roles: ["admin"],
-  },
+  { title: "Control de Ventas", icon: CreditCard, path: "/admin/sales", roles: ["recepcionista", "admin"] },
+  { title: "Caja", icon: Wallet, path: "/admin/cash", roles: ["admin"] },
+  { title: "Servicios", icon: Dumbbell, path: "/admin/services", roles: ["admin"] },
+  { title: "Productos", icon: Package, path: "/admin/products", roles: ["recepcionista", "admin"] },
+  { title: "Cupones", icon: Ticket, path: "/admin/cupones", roles: ["admin"] },
+  { title: "Lista de Miembros", icon: Users, path: "/admin/members", roles: ["recepcionista", "admin"] },
+  { title: "Gestión de Trabajadores", icon: UserCog, path: "/admin/employees", roles: ["admin"] },
+  { title: "Coaches", icon: Award, path: "/admin/coaches", roles: ["admin"] },
+  { title: "Reportes", icon: TrendingUp, path: "/admin/reports", roles: ["admin"] },
+  { title: "Recordatorios", icon: Bell, path: "/admin/reminders", roles: ["admin"] },
 ];
 
 const reportsSubmenuItems: SidebarItem[] = [
-  {
-    title: "Reporte Servicios",
-    icon: PieChart,
-    path: "/admin/reporte-servicios",
-    roles: ["admin"],
-  },
-  {
-    title: "Reporte Productos",
-    icon: Package,
-    path: "/admin/reporte-productos",
-    roles: ["admin"],
-  },
-  {
-    title: "Reporte Empleados",
-    icon: Briefcase,
-    path: "/admin/reporte-empleados",
-    roles: ["admin"],
-  },
-  // ❌ ELIMINADO de aquí: "Recordatorios" (ahora está en el menú principal)
+  { title: "Reporte Servicios", icon: PieChart, path: "/admin/reporte-servicios", roles: ["admin"] },
+  { title: "Reporte Productos", icon: Package, path: "/admin/reporte-productos", roles: ["admin"] },
+  { title: "Reporte Empleados", icon: Briefcase, path: "/admin/reporte-empleados", roles: ["admin"] },
 ];
 
 const additionalSidebarItems: SidebarItem[] = [
-  {
-    title: "Inscribir",
-    icon: UserPlus,
-    path: "/admin/register",
-    roles: ["recepcionista"],
-  },
-  {
-    title: "Pagos Pendientes",
-    icon: Clock,
-    path: "/admin/pending",
-    roles: ["recepcionista"],
-  },
-
-  {
-    title: "Vender Producto",
-    icon: ShoppingCart,
-    path: "/admin/sell",
-    roles: ["recepcionista"],
-  },
-  {
-    title: "Nueva Transacción",
-    icon: PlusCircle,
-    path: "/admin/transaction",
-    roles: ["recepcionista"],
-  },
-  {
-    title: "Control de Acceso",
-    icon: Fingerprint,
-    path: "/admin/access",
-    roles: ["recepcionista"],
-  },
+  { title: "Inscribir", icon: UserPlus, path: "/admin/register", roles: ["recepcionista"] },
+  { title: "Pagos Pendientes", icon: Clock, path: "/admin/pending", roles: ["recepcionista"] },
+  { title: "Vender Producto", icon: ShoppingCart, path: "/admin/sell", roles: ["recepcionista"] },
+  { title: "Nueva Transacción", icon: PlusCircle, path: "/admin/transaction", roles: ["recepcionista"] },
+  { title: "Control de Acceso", icon: Fingerprint, path: "/admin/access", roles: ["recepcionista"] },
 ];
-
-// ============================================
-// HELPER: auto-procesar huella en segundo plano
-// ============================================
-async function processFingerprintInBackground(ci: string, user: any) {
-  if (!user?.idsucursal || !user?.idusuario) return;
-
-  try {
-    const foundMembers = await AccessApi.searchMembers(
-      ci,
-      "all",
-      user.idsucursal
-    );
-
-    if (!foundMembers || foundMembers.length === 0) {
-      toast({
-        title: "🔴 Huella no reconocida",
-        description: `No se encontró ningún miembro con CI: ${ci}`,
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (foundMembers.length > 1) {
-      toast({
-        title: "⚠️ Múltiples coincidencias",
-        description:
-          "Se encontraron varios miembros. Ve al Control de Acceso para seleccionar.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const member: ApiMember = foundMembers[0];
-
-    // ================ CLIENTE ================
-    if (member.memberType === "client") {
-      if (member.services.length === 0) {
-        toast({
-          title: "🔴 Acceso Denegado",
-          description: `${member.name} no tiene servicios activos`,
-          variant: "destructive",
-        });
-        return;
-      }
-
-      if (member.services.length > 1) {
-        toast({
-          title: "⚠️ Múltiples servicios",
-          description: `${member.name} tiene ${member.services.length} servicios. Ve al Control de Acceso para seleccionar.`,
-          variant: "destructive",
-        });
-        return;
-      }
-
-      const service = member.services[0];
-      const result = await AccessApi.registerClientAccess(
-        parseInt(member.id),
-        parseInt(service.id),
-        user.idsucursal,
-        user.idusuario
-      );
-
-      if (result.success) {
-        toast({
-          title: "✅ Acceso Registrado",
-          description: `${member.name} - ${service.name}. ${result.message}`,
-          variant: "success",
-        });
-
-        if (result.tieneDeuda && result.deudaInfo) {
-          setTimeout(() => {
-            toast({
-              title: "⚠️ Cliente con Deuda",
-              description: `${member.name} debe Bs. ${result.deudaInfo?.montoPendiente.toFixed(2)} por ${result.deudaInfo?.servicioNombre}`,
-              variant: "destructive",
-            });
-          }, 800);
-        }
-      } else {
-        toast({
-          title: "🔴 Acceso Denegado",
-          description: `${member.name} - ${result.message}`,
-          variant: "destructive",
-        });
-      }
-      return;
-    }
-
-    // ================ EMPLEADO ================
-    if (member.memberType === "employee") {
-      if (!member.employeeInfo) {
-        toast({
-          title: "🔴 Error",
-          description: "No se encontró información del empleado",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      const employeeId = parseInt(member.employeeInfo.id);
-      const isInside = member.employeeInfo.status === "in";
-
-      if (isInside) {
-        const result = await AccessApi.registerEmployeeCheckOut(
-          employeeId,
-          user.idsucursal,
-          user.idusuario
-        );
-        toast({
-          title: "✅ Salida Registrada",
-          description: `${member.name} - ${result.message}`,
-          variant: "success",
-        });
-      } else {
-        const result = await AccessApi.registerEmployeeCheckIn(
-          employeeId,
-          user.idsucursal,
-          user.idusuario
-        );
-        toast({
-          title: result.isLate ? "⚠️ Entrada Tardía" : "✅ Entrada Registrada",
-          description: `${member.name} - ${result.message}`,
-          variant: result.isLate ? "destructive" : "success",
-        });
-      }
-      return;
-    }
-  } catch (error: any) {
-    console.error("Error procesando huella en segundo plano:", error);
-    toast({
-      title: "🔴 Error",
-      description: error.message || "No se pudo procesar la huella",
-      variant: "destructive",
-    });
-  }
-}
 
 export function AdminLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -320,115 +82,207 @@ export function AdminLayout() {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [floatingSaleOpen, setFloatingSaleOpen] = useState(false);
 
+  // ✅ Estados de huella global
+  const [fingerprintPaused, setFingerprintPaused] = useState<boolean>(false);
+  const [fingerprintBusy, setFingerprintBusy] = useState(false);
+  const [fingerprintLastCi, setFingerprintLastCi] = useState<string | null>(null);
+  const [hasActiveToast, setHasActiveToast] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  const fingerprintPausedRef = useRef<boolean>(false);
+  const lastReadRef = useRef<number>(0);
+  const processingRef = useRef<boolean>(false);
+
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useUser();
 
-  // ✅ CAMBIO: helper para saber si el usuario actual es staff operativo (admin o recepcionista)
   const isStaffOperativo = ["admin", "recepcionista"].includes(user?.rol ?? "");
+  const canUseFingerprint = isStaffOperativo;
 
-  // ✅ Determinar si estamos en la vista de Control de Acceso
-  const isAccessView = location.pathname.startsWith("/admin/access");
+  // Detectar móvil
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
 
-  // ✅ Estado para saber si el lector global está pausado
-  const [fingerprintPaused, setFingerprintPaused] = useState<boolean>(false);
+  // Detectar toasts (para reposicionar botón reconectar)
+  useEffect(() => {
+    const checkToasts = () => {
+      const viewport = document.querySelector(
+        '[data-radix-toast-viewport], [data-sonner-toaster], [role="region"][aria-label*="Notification"], ol[tabindex="-1"]'
+      );
+      if (viewport) {
+        const toasts = viewport.querySelectorAll(
+          '[data-state="open"], [data-radix-toast-item], li'
+        );
+        setHasActiveToast(toasts.length > 0);
+      } else {
+        setHasActiveToast(false);
+      }
+    };
+    checkToasts();
+    const observer = new MutationObserver(() => checkToasts());
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["data-state", "data-radix-toast-item"],
+    });
+    return () => observer.disconnect();
+  }, []);
 
-  // ✅ Escuchar cambios en la bandera de pausa
+  // Escuchar cambios en la bandera de pausa
   useEffect(() => {
     const handler = (e: Event) => {
       const customEvent = e as CustomEvent<{ paused: boolean }>;
-      console.log(
-        "🔒 [AdminLayout] fingerprint-pause-changed:",
-        customEvent.detail
-      );
-      setFingerprintPaused(customEvent.detail?.paused === true);
+      const paused = customEvent.detail?.paused === true;
+      setFingerprintPaused(paused);
+      fingerprintPausedRef.current = paused;
     };
     window.addEventListener("fingerprint-pause-changed", handler);
-    return () => {
-      window.removeEventListener("fingerprint-pause-changed", handler);
-    };
+    return () => window.removeEventListener("fingerprint-pause-changed", handler);
   }, []);
 
-  // ✅ Al cambiar de ruta, sincronizar la bandera
+  // Sincronizar bandera con la ruta
   useEffect(() => {
     const paused = (window as any).__FINGERPRINT_PAUSED__ === true;
-    if (!location.pathname.startsWith("/admin/register")) {
-      if (paused) {
-        (window as any).__FINGERPRINT_PAUSED__ = false;
-        window.dispatchEvent(
-          new CustomEvent("fingerprint-pause-changed", {
-            detail: { paused: false },
-          })
-        );
-      }
-      setFingerprintPaused(false);
-    } else {
-      setFingerprintPaused(paused);
-    }
+    fingerprintPausedRef.current = paused;
+    setFingerprintPaused(paused);
   }, [location.pathname]);
 
-  // ✅ CAMBIO: Activar el lector de huella globalmente para admin Y recepcionista
-  useFingerprintIdentify({
-    onVerified: () => {
-      // El trabajo real lo hace el listener global de 'fingerprint-verified'
-    },
-    enabled: isStaffOperativo && !isAccessView && !fingerprintPaused,
-  });
-
-  // ✅ Log para confirmar el estado
-  useEffect(() => {
-    console.log(
-      "🎛️ [AdminLayout] Estado SSE identify:",
-      isStaffOperativo && !isAccessView && !fingerprintPaused
-        ? "ACTIVO"
-        : "PAUSADO"
-    );
-  }, [isStaffOperativo, isAccessView, fingerprintPaused]);
-
-  // ============================================
-  // LISTENER GLOBAL DE HUELLA (SEGUNDO PLANO)
-  // ============================================
-  const lastReadRef = useRef<number>(0);
-  const processingRef = useRef<boolean>(false);
-
-  useEffect(() => {
-    // ✅ CAMBIO: admin y recepcionista
-    if (!isStaffOperativo) return;
+  // ✅ HUELLA → registro directo en backend (igual que Mutant)
+  const processFingerprintInBackground = async (ci: string) => {
     if (!user?.idsucursal || !user?.idusuario) return;
-    if (location.pathname.startsWith("/admin/access")) return;
-
-    const handler = async (event: Event) => {
-      // Si el hook está pausado (RegisterMember lo pausa), ignorar
-      if ((window as any).__FINGERPRINT_PAUSED__) return;
-
-      const e = event as CustomEvent<{ ci: string }>;
-      const ci = e.detail?.ci;
-      if (!ci) return;
-
-      // Anti-spam: mínimo 2.5s entre lecturas
-      const now = Date.now();
-      if (now - lastReadRef.current < 2500) return;
-      if (processingRef.current) return;
-
-      lastReadRef.current = now;
-      processingRef.current = true;
-
-      try {
-        await processFingerprintInBackground(ci, user);
-      } finally {
-        setTimeout(() => {
-          processingRef.current = false;
-        }, 1500);
+    try {
+      const res = await AccessApi.registerByFingerprint(
+        ci,
+        user.idsucursal,
+        user.idusuario
+      );
+      switch (res.mode) {
+        case "client_auto": {
+          if (res.denied || res.success === false) {
+            toast({
+              title: "🔴 Acceso Denegado",
+              description: `${res.memberName || "Cliente"} - ${res.message}`,
+              variant: "destructive",
+            });
+          } else {
+            toast({
+              title: "✅ Acceso Registrado",
+              description: `${res.memberName || ""} - ${res.message}`,
+              variant: "success",
+            });
+          }
+          if (res.tieneDeuda && res.deudaInfo) {
+            setTimeout(() => {
+              toast({
+                title: "⚠️ Cliente con Deuda",
+                description: `${res.memberName || "Cliente"} debe Bs. ${res.deudaInfo?.montoPendiente.toFixed(2)} por ${res.deudaInfo?.servicioNombre}`,
+                variant: "destructive",
+              });
+            }, 800);
+          }
+          break;
+        }
+        case "employee": {
+          if (res.denied || res.success === false) {
+            toast({
+              title: "🔴 Acceso Denegado",
+              description: `${res.memberName || ""} - ${res.message}`,
+              variant: "destructive",
+            });
+          } else {
+            toast({
+              title: res.isLate ? "⚠️ Entrada Tardía" : "✅ Registro de Empleado",
+              description: `${res.memberName || ""} - ${res.message}`,
+              variant: res.isLate ? "destructive" : "success",
+            });
+          }
+          break;
+        }
+        case "requires_selection": {
+          toast({
+            title: "⚠️ Varios servicios activos",
+            description: (
+              <div
+                className="cursor-pointer hover:opacity-80 transition-opacity"
+                onClick={() => navigate(`/admin/access?search=${ci}`)}
+              >
+                <p>
+                  {res.memberName || "Cliente"} tiene{" "}
+                  {res.services?.length || "varios"} servicios (
+                  {(res.services || []).map((s) => s.name).join(", ")}).
+                </p>
+                <p className="font-semibold underline mt-1">
+                  👉 Haz clic aquí para elegir uno en Control de Acceso
+                </p>
+              </div>
+            ),
+            className: "bg-amber-500 text-black border-amber-600 shadow-lg",
+          });
+          break;
+        }
+        case "denied":
+        case "not_found":
+        default: {
+          toast({
+            title: res.mode === "not_found" ? "🔴 Huella no reconocida" : "🔴 Acceso Denegado",
+            description: res.message,
+            variant: "destructive",
+          });
+        }
       }
-    };
+    } catch (error: any) {
+      console.error("Error procesando huella en segundo plano:", error);
+      toast({
+        title: "🔴 Error",
+        description: error.message || "No se pudo procesar la huella",
+        variant: "destructive",
+      });
+    }
+  };
 
-    window.addEventListener("fingerprint-verified", handler);
-    return () => {
-      window.removeEventListener("fingerprint-verified", handler);
-    };
-  }, [isStaffOperativo, user?.idsucursal, user?.idusuario, location.pathname]);
+  // ✅ Hook global de huella (activo en TODAS las vistas, incluida /admin/access)
+  const { message: fingerprintMessage, isUnavailable, reconnect } =
+    useFingerprintIdentify({
+      enabled: isStaffOperativo && !isMobile && !fingerprintPaused,
+      onVerified: async (ci: string) => {
+        if (!canUseFingerprint) return;
+        if (fingerprintPausedRef.current) return;
+        if ((window as any).__FINGERPRINT_PAUSED__ === true) return;
+        if (!ci) return;
+
+        const now = Date.now();
+        if (now - lastReadRef.current < 2500) return;
+        if (processingRef.current) return;
+
+        lastReadRef.current = now;
+        processingRef.current = true;
+        setFingerprintBusy(true);
+        setFingerprintLastCi(ci);
+        try {
+          await processFingerprintInBackground(ci);
+        } finally {
+          setTimeout(() => {
+            setFingerprintBusy(false);
+            setFingerprintLastCi(null);
+            processingRef.current = false;
+          }, 600);
+        }
+      },
+    });
 
   const handleLogout = () => {
+    (window as any).__FINGERPRINT_PAUSED__ = false;
+    fingerprintPausedRef.current = false;
+    setFingerprintPaused(false);
+    window.dispatchEvent(
+      new CustomEvent("fingerprint-pause-changed", { detail: { paused: false } })
+    );
     logout();
     navigate("/login");
   };
@@ -440,7 +294,6 @@ export function AdminLayout() {
     window.open(url, "_blank");
   };
 
-  // ✅ CAMBIO CLAVE: el admin ve TODOS los items sin filtro de roles
   const filterItemsByRole = (items: SidebarItem[]) => {
     if (user?.rol === "admin") return items;
     return items.filter(
@@ -455,24 +308,12 @@ export function AdminLayout() {
   const getCurrentItems = () => {
     const todosItems = [...filteredMainItems, ...filteredAdditionalItems];
 
-    // ✅ CAMBIO: orden personalizado para admin (incluye TODAS las opciones)
     if (user?.rol === "admin") {
       const ordenAdmin = [
-        "Control de Acceso",
-        "Inscribir",
-        "Pagos Pendientes",
-        "Lista de Miembros",
-        "Servicios",
-        "Productos",
-        "Vender Producto",
-        "Control de Ventas",
-        "Nueva Transacción",
-        "Caja",
-        "Cupones",
-        "Gestión de Trabajadores",
-        "Coaches",
-        "Reportes",
-        "Recordatorios",
+        "Control de Acceso", "Inscribir", "Pagos Pendientes", "Lista de Miembros",
+        "Servicios", "Productos", "Vender Producto", "Control de Ventas",
+        "Nueva Transacción", "Caja", "Cupones", "Gestión de Trabajadores",
+        "Coaches", "Reportes", "Recordatorios",
       ];
       return ordenAdmin
         .map((titulo) => todosItems.find((item) => item.title === titulo))
@@ -481,14 +322,8 @@ export function AdminLayout() {
 
     if (user?.rol === "recepcionista") {
       const ordenRecepcionista = [
-        "Control de Acceso",
-        "Inscribir",
-        "Pagos Pendientes",
-        "Lista de Miembros",
-        "Productos",
-        "Vender Producto",
-        "Control de Ventas",
-        "Nueva Transacción",
+        "Control de Acceso", "Inscribir", "Pagos Pendientes", "Lista de Miembros",
+        "Productos", "Vender Producto", "Control de Ventas", "Nueva Transacción",
       ];
       return ordenRecepcionista
         .map((titulo) => todosItems.find((item) => item.title === titulo))
@@ -511,31 +346,16 @@ export function AdminLayout() {
   };
 
   const isActivePath = (path: string) => {
-    if (path === "/admin/cash") {
-      return location.pathname.startsWith("/admin/cash");
-    }
-    if (path === "/admin/reports" && showReportsSubmenu) {
+    if (path === "/admin/cash") return location.pathname.startsWith("/admin/cash");
+    if (path === "/admin/reports" && showReportsSubmenu)
       return location.pathname === "/admin/reports";
-    }
     return location.pathname === path;
-  };
-
-  const isReportActive = (path: string) => {
-    return (
-      location.pathname === path ||
-      location.pathname.startsWith("/admin/reporte-")
-    );
   };
 
   useEffect(() => {
     if (user && location.pathname === "/admin") {
-      if (user.rol === "admin") {
-        navigate("/admin/sales");
-      } else if (user.rol === "recepcionista") {
-        navigate("/admin/access");
-      } else {
-        navigate("/admin/access");
-      }
+      if (user.rol === "admin") navigate("/admin/sales");
+      else navigate("/admin/access");
     }
   }, [user, location.pathname, navigate]);
 
@@ -549,28 +369,19 @@ export function AdminLayout() {
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
-      if (!target.closest(".user-menu-container")) {
-        setUserMenuOpen(false);
-      }
+      if (!target.closest(".user-menu-container")) setUserMenuOpen(false);
     };
     document.addEventListener("click", handleClickOutside);
     return () => document.removeEventListener("click", handleClickOutside);
   }, []);
 
   useEffect(() => {
-    if (sidebarCollapsed) {
-      setShowReportsSubmenu(false);
-    }
+    if (sidebarCollapsed) setShowReportsSubmenu(false);
   }, [sidebarCollapsed]);
 
   const getUserInitials = () => {
     if (!user?.name) return "U";
-    return user.name
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
-      .toUpperCase()
-      .slice(0, 2);
+    return user.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
   };
 
   const getRolDisplay = () => {
@@ -579,15 +390,12 @@ export function AdminLayout() {
     return user?.rol?.toUpperCase() || "";
   };
 
-  const toggleSidebar = () => {
-    setSidebarCollapsed(!sidebarCollapsed);
-  };
+  const toggleSidebar = () => setSidebarCollapsed(!sidebarCollapsed);
 
   const SidebarContent = () => (
     <div className="flex flex-col h-full min-h-0">
       <div className="h-[73px] flex-shrink-0 hidden lg:block"></div>
 
-      {/* ✅ Nav: flex-1 + min-h-0 para que SOLO esto scrollee */}
       <nav
         className={`px-4 pb-4 space-y-2 flex-1 min-h-0 overflow-y-auto custom-scrollbar ${
           sidebarCollapsed ? "px-2" : ""
@@ -598,7 +406,6 @@ export function AdminLayout() {
             const Icon = item.icon;
             const isActive = isActivePath(item.path);
             const isReports = item.title === "Reportes";
-            const isReportsActive = isReportActive(item.path);
 
             return (
               <div key={item.path}>
@@ -639,7 +446,6 @@ export function AdminLayout() {
                     {filteredReportsItems.map((subItem) => {
                       const SubIcon = subItem.icon;
                       const isSubActive = location.pathname === subItem.path;
-
                       return (
                         <button
                           key={subItem.path}
@@ -666,27 +472,23 @@ export function AdminLayout() {
         </div>
       </nav>
 
-      {/* ✅ Footer FIJO: no scrollea, queda siempre visible dentro del sidebar */}
       {!sidebarCollapsed && (
         <>
           <div className="flex-shrink-0 p-4 border-t border-border space-y-3">
-            <div className="space-y-1">
-              <Button
-                variant="outline"
-                className="w-full justify-start group hover:bg-accent"
-                onClick={handleWhatsAppClick}
-              >
-                <Phone size={16} className="mr-2" />
-                <div className="flex-1 text-left">
-                  <div className="font-medium">Contactar Soporte</div>
-                  <div className="text-xs text-muted-foreground group-hover:text-black">
-                    +591 67461937
-                  </div>
+            <Button
+              variant="outline"
+              className="w-full justify-start group hover:bg-accent"
+              onClick={handleWhatsAppClick}
+            >
+              <Phone size={16} className="mr-2" />
+              <div className="flex-1 text-left">
+                <div className="font-medium">Contactar Soporte</div>
+                <div className="text-xs text-muted-foreground group-hover:text-black">
+                  +591 67461937
                 </div>
-              </Button>
-            </div>
+              </div>
+            </Button>
           </div>
-
           <div className="flex-shrink-0 p-4 border-t border-border">
             <p className="text-xs text-muted-foreground text-center">
               Realizado por SPIDERLABS SYSTEMS S.R.L.
@@ -722,16 +524,12 @@ export function AdminLayout() {
             className="hidden lg:flex flex-shrink-0"
             title={sidebarCollapsed ? "Expandir menú" : "Colapsar menú"}
           >
-            {sidebarCollapsed ? (
-              <PanelLeftOpen size={20} />
-            ) : (
-              <PanelLeftClose size={20} />
-            )}
+            {sidebarCollapsed ? <PanelLeftOpen size={20} /> : <PanelLeftClose size={20} />}
           </Button>
 
           <img
             src={mutantLogo}
-            alt="MUTANT"
+            alt="ENERFIT"
             className={`h-[70px] w-auto flex-shrink-0 object-contain transition-all duration-300 ${
               sidebarCollapsed ? "ml-0" : ""
             }`}
@@ -745,26 +543,18 @@ export function AdminLayout() {
               className="flex items-center gap-3 bg-muted/50 rounded-full px-4 py-1.5 border border-border/50 hover:bg-muted transition-colors"
             >
               <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                <span className="text-primary font-semibold text-sm">
-                  {getUserInitials()}
-                </span>
+                <span className="text-primary font-semibold text-sm">{getUserInitials()}</span>
               </div>
               <div className="flex flex-col items-start">
-                <span className="text-sm font-medium text-foreground">
-                  {user?.name}
-                </span>
+                <span className="text-sm font-medium text-foreground">{user?.name}</span>
                 <div className="flex items-center gap-2">
                   {user?.sucursalNombre && (
                     <>
-                      <span className="text-xs text-muted-foreground">
-                        {user.sucursalNombre}
-                      </span>
+                      <span className="text-xs text-muted-foreground">{user.sucursalNombre}</span>
                       <span className="text-xs text-muted-foreground">•</span>
                     </>
                   )}
-                  <span className="text-xs font-medium text-primary">
-                    {getRolDisplay()}
-                  </span>
+                  <span className="text-xs font-medium text-primary">{getRolDisplay()}</span>
                 </div>
               </div>
               <ChevronDown
@@ -802,14 +592,9 @@ export function AdminLayout() {
           </div>
 
           <div className="relative md:hidden user-menu-container">
-            <button
-              onClick={() => setUserMenuOpen(!userMenuOpen)}
-              className="flex items-center gap-2"
-            >
+            <button onClick={() => setUserMenuOpen(!userMenuOpen)} className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                <span className="text-primary font-semibold text-xs">
-                  {getUserInitials()}
-                </span>
+                <span className="text-primary font-semibold text-xs">{getUserInitials()}</span>
               </div>
               <ChevronDown
                 size={14}
@@ -823,16 +608,10 @@ export function AdminLayout() {
               <div className="absolute right-0 mt-2 w-56 bg-card rounded-lg shadow-lg border border-border overflow-hidden z-50">
                 <div className="p-2 space-y-1">
                   <div className="px-3 py-2 border-b border-border">
-                    <p className="text-sm font-medium text-foreground">
-                      {user?.name}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {getRolDisplay()}
-                    </p>
+                    <p className="text-sm font-medium text-foreground">{user?.name}</p>
+                    <p className="text-xs text-muted-foreground">{getRolDisplay()}</p>
                     {user?.sucursalNombre && (
-                      <p className="text-xs text-muted-foreground">
-                        {user.sucursalNombre}
-                      </p>
+                      <p className="text-xs text-muted-foreground">{user.sucursalNombre}</p>
                     )}
                   </div>
                   <button
@@ -875,7 +654,6 @@ export function AdminLayout() {
               className="fixed inset-0 bg-black/50 z-40 lg:hidden backdrop-blur-sm"
               onClick={() => setSidebarOpen(false)}
             />
-            {/* ✅ CAMBIO: overflow-hidden (antes overflow-y-auto) para que solo el nav scrollee */}
             <aside className="fixed top-[73px] left-0 w-64 h-[calc(100vh-73px)] bg-card border-r border-border overflow-hidden z-50 lg:hidden flex flex-col shadow-xl animate-in slide-in-from-left-2 duration-200">
               <SidebarContent />
             </aside>
@@ -895,7 +673,49 @@ export function AdminLayout() {
         </main>
       </div>
 
-      {/* ✅ CAMBIO: botón flotante "Vender Producto" también para admin */}
+      {/* ✅ Overlay "Procesando huella" */}
+      {!isMobile && fingerprintBusy && (
+        <div className="fixed top-[85px] right-4 sm:right-6 z-[100] pointer-events-none animate-in fade-in slide-in-from-top-4 duration-200">
+          <div className="bg-card text-card-foreground shadow-2xl rounded-xl border border-primary/40 px-6 py-4 flex items-center gap-4 pointer-events-auto min-w-[280px]">
+            <div className="relative flex-shrink-0">
+              <div className="w-11 h-11 rounded-full border-[4px] border-primary/20 border-t-primary animate-spin" />
+              <Fingerprint
+                size={20}
+                className="absolute inset-0 m-auto text-primary animate-pulse"
+              />
+            </div>
+            <div>
+              <div className="font-bold text-base leading-tight">Procesando huella</div>
+              <div className="text-sm text-muted-foreground leading-tight mt-1 max-w-[220px] truncate">
+                {fingerprintMessage
+                  ? fingerprintMessage
+                  : fingerprintLastCi
+                  ? `CI ${fingerprintLastCi}`
+                  : "Verificando identidad..."}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ✅ Botón "Reconectar Lector de Huella" (en TODAS las vistas, incluida /admin/access) */}
+      {!isMobile && !fingerprintPaused && isUnavailable && (
+        <div
+          className={`fixed right-4 sm:right-6 z-[100] transition-all duration-500 ease-in-out ${
+            hasActiveToast ? "top-[150px]" : "top-[85px]"
+          }`}
+        >
+          <Button
+            variant="destructive"
+            className="shadow-2xl flex items-center gap-2 border-2 border-red-400/50 hover:scale-105 transition-transform animate-in fade-in slide-in-from-top-4 duration-300"
+            onClick={reconnect}
+          >
+            <RefreshCw size={18} className="animate-pulse" />
+            Reconectar Lector de Huella
+          </Button>
+        </div>
+      )}
+
       {isStaffOperativo && location.pathname !== "/admin/sell" && (
         <>
           <div
@@ -912,10 +732,7 @@ export function AdminLayout() {
             `}
             style={{ transformOrigin: "bottom right" }}
           >
-            <SellProducts
-              compact
-              onSaleSuccess={() => setFloatingSaleOpen(false)}
-            />
+            <SellProducts compact onSaleSuccess={() => setFloatingSaleOpen(false)} />
           </div>
 
           <button
@@ -933,77 +750,46 @@ export function AdminLayout() {
           scrollbar-width: thin;
           scrollbar-color: hsl(var(--muted-foreground)) hsl(var(--card));
         }
-
-        .custom-scrollbar::-webkit-scrollbar {
-          width: 6px;
-        }
-
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track {
           background: hsl(var(--card));
           border-radius: 3px;
         }
-
         .custom-scrollbar::-webkit-scrollbar-thumb {
           background: hsl(var(--muted-foreground) / 0.3);
           border-radius: 3px;
         }
-
         .custom-scrollbar::-webkit-scrollbar-thumb:hover {
           background: hsl(var(--muted-foreground) / 0.5);
         }
-
-        @keyframes fade-in {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-
+        @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
         @keyframes slide-in-from-top-2 {
           from { transform: translateY(-0.5rem); opacity: 0; }
           to { transform: translateY(0); opacity: 1; }
         }
-
+        @keyframes slide-in-from-top-4 {
+          from { transform: translateY(-1rem); opacity: 0; }
+          to { transform: translateY(0); opacity: 1; }
+        }
         @keyframes slide-in-from-left-2 {
           from { transform: translateX(-1rem); opacity: 0; }
           to { transform: translateX(0); opacity: 1; }
         }
-
         @keyframes slide-in-from-bottom-4 {
           from { transform: translateY(1rem); opacity: 0; }
           to { transform: translateY(0); opacity: 1; }
         }
-
-        .animate-in {
-          animation-duration: 0.2s;
-          animation-fill-mode: both;
-        }
-
-        .fade-in {
-          animation-name: fade-in;
-        }
-
-        .slide-in-from-top-2 {
-          animation-name: slide-in-from-top-2;
-        }
-
-        .slide-in-from-left-2 {
-          animation-name: slide-in-from-left-2;
-        }
-
-        .slide-in-from-bottom-4 {
-          animation-name: slide-in-from-bottom-4;
-        }
-
+        .animate-in { animation-duration: 0.2s; animation-fill-mode: both; }
+        .fade-in { animation-name: fade-in; }
+        .slide-in-from-top-2 { animation-name: slide-in-from-top-2; }
+        .slide-in-from-top-4 { animation-name: slide-in-from-top-4; }
+        .slide-in-from-left-2 { animation-name: slide-in-from-left-2; }
+        .slide-in-from-bottom-4 { animation-name: slide-in-from-bottom-4; }
         @media (max-width: 1024px) {
-          .custom-scrollbar::-webkit-scrollbar {
-            width: 4px;
-          }
+          .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         }
-
         @media (max-width: 1023px) {
-          main {
-            margin-left: 0 !important;
-            width: 100%;
-          }
+          main { margin-left: 0 !important; width: 100%; }
         }
       `}</style>
     </div>
