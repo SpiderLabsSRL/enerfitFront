@@ -1,4 +1,3 @@
-// src/hooks/useFingerprintIdentify.ts
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { toast } from '@/components/ui/use-toast';
 import { getStoredUserData } from '@/api/loginapi';
@@ -6,12 +5,14 @@ import { getStoredUserData } from '@/api/loginapi';
 interface UseFingerprintReaderOptions {
   onVerified: (personaCI: string) => void;
   enabled?: boolean;
+  autoRestart?: boolean;
+  restartDelay?: number;
 }
 
 export const useFingerprintIdentify = ({
   onVerified,
   enabled = true,
-}: UseFingerprintReaderOptions) => {
+}: Omit<UseFingerprintReaderOptions, 'autoRestart' | 'restartDelay'>) => {
   const [message, setMessage] = useState<string>('');
   const [isUnavailable, setIsUnavailable] = useState<boolean>(false);
 
@@ -52,7 +53,6 @@ export const useFingerprintIdentify = ({
 
   /**
    * Marca el lector como no disponible y DETIENE el bucle de reconexión.
-   * El usuario debe presionar "Reconectar Lector de Huella" para volver a intentar.
    */
   const markUnavailable = useCallback(() => {
     clearReconnectTimer();
@@ -61,14 +61,16 @@ export const useFingerprintIdentify = ({
     setIsUnavailable(true);
 
     if (!hasShownErrorRef.current) {
-      const { dismiss } = toast({
+      // 👇 GUARDAMOS EL ID DEL TOAST PARA CERRARLO MANUALMENTE
+      const { id, dismiss } = toast({
         title: 'Lector no disponible',
         description:
           'No se pudo conectar con el lector de huella. Presiona el botón de reconectar.',
         variant: 'destructive',
-        duration: 4000,
+        duration: 4000, 
       });
 
+      // 👇 FORZAMOS EL CIERRE A LOS 4 SEGUNDOS POR SI ACASO
       setTimeout(() => {
         dismiss();
       }, 4000);
@@ -78,8 +80,12 @@ export const useFingerprintIdentify = ({
   }, [clearReconnectTimer, safeClose]);
 
   const connect = useCallback(() => {
-    if (isConnectingRef.current || eventSourceRef.current) return;
-    if (!isEnabledRef.current) return;
+    if (isConnectingRef.current || eventSourceRef.current) {
+      return;
+    }
+    if (!isEnabledRef.current) {
+      return;
+    }
 
     clearReconnectTimer();
     isConnectingRef.current = true;
@@ -156,6 +162,8 @@ export const useFingerprintIdentify = ({
         });
         return;
       }
+
+      // timeout, complete, heartbeat, etc. → no hacer nada
     };
 
     const events = [
@@ -194,7 +202,7 @@ export const useFingerprintIdentify = ({
     shouldReconnectRef.current = true;
     setIsUnavailable(false);
     disconnect();
-    setTimeout(() => connect(), 500);
+    setTimeout(() => connect(), 500); 
   }, [connect, disconnect]);
 
   useEffect(() => {
