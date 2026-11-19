@@ -67,18 +67,38 @@ export interface TransactionsResponse {
   };
 }
 
-// NUEVA INTERFACE para totales
 export interface FilterTotals {
   totalIngresos: number;
   totalEgresos: number;
   totalCaja: number;
 }
 
-interface TransactionsFilters {
-  dateFilterType?: "all" | "specific" | "range" | "today" | "yesterday" | "thisWeek" | "lastWeek" | "thisMonth" | "lastMonth";
+export type TransactionTypeFilter =
+  | "all"
+  | "ingreso"
+  | "egreso"
+  | "apertura"
+  | "cierre";
+
+export type SortOrder = "asc" | "desc";
+
+export interface TransactionsFilters {
+  dateFilterType?:
+    | "all"
+    | "specific"
+    | "range"
+    | "today"
+    | "yesterday"
+    | "thisWeek"
+    | "lastWeek"
+    | "thisMonth"
+    | "lastMonth";
   specificDate?: string;
   startDate?: string;
   endDate?: string;
+  type?: TransactionTypeFilter;
+  empleado?: string;
+  sortOrder?: SortOrder;
   page?: number;
   pageSize?: number;
 }
@@ -91,7 +111,6 @@ const api = axios.create({
   },
 });
 
-// Interceptor para agregar token automáticamente
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem("token");
   if (token) {
@@ -100,6 +119,9 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+// ============================================
+// SUCURSALES
+// ============================================
 export const getBranches = async (): Promise<Branch[]> => {
   try {
     const response = await api.get<BackendBranch[]>("/cash/branches");
@@ -114,9 +136,16 @@ export const getBranches = async (): Promise<Branch[]> => {
   }
 };
 
-export const getCashBoxesByBranch = async (branchId: number): Promise<CashBox[]> => {
+// ============================================
+// CAJAS POR SUCURSAL
+// ============================================
+export const getCashBoxesByBranch = async (
+  branchId: number
+): Promise<CashBox[]> => {
   try {
-    const response = await api.get<BackendCashBox[]>(`/cash/branches/${branchId}/cashboxes`);
+    const response = await api.get<BackendCashBox[]>(
+      `/cash/branches/${branchId}/cashboxes`
+    );
     return response.data.map((cashbox) => ({
       idCaja: cashbox.id,
       nombre: cashbox.nombre,
@@ -129,11 +158,18 @@ export const getCashBoxesByBranch = async (branchId: number): Promise<CashBox[]>
   }
 };
 
-export const getCashBoxStatus = async (cashBoxId: number): Promise<CashBoxStatus> => {
+// ============================================
+// ESTADO DE CAJA
+// ============================================
+export const getCashBoxStatus = async (
+  cashBoxId: number
+): Promise<CashBoxStatus> => {
   try {
-    const response = await api.get<BackendCashBoxStatus>(`/cash/cashboxes/${cashBoxId}/status`);
+    const response = await api.get<BackendCashBoxStatus>(
+      `/cash/cashboxes/${cashBoxId}/status`
+    );
     return {
-      montoFinal: parseFloat(response.data.monto_final)
+      montoFinal: parseFloat(response.data.monto_final),
     };
   } catch (error) {
     console.error("Error fetching cash box status:", error);
@@ -141,6 +177,9 @@ export const getCashBoxStatus = async (cashBoxId: number): Promise<CashBoxStatus
   }
 };
 
+// ============================================
+// MOVIMIENTOS POR CAJA
+// ============================================
 export const getTransactionsByCashBox = async (
   cashBoxId: number,
   filters: TransactionsFilters = {},
@@ -148,7 +187,10 @@ export const getTransactionsByCashBox = async (
   pageSize: number = 20
 ): Promise<TransactionsResponse> => {
   try {
-    console.log("🔄 Obteniendo transacciones con filtros:", filters, { page, pageSize });
+    console.log("🔄 Obteniendo transacciones con filtros:", filters, {
+      page,
+      pageSize,
+    });
 
     const params: any = {
       page,
@@ -159,6 +201,10 @@ export const getTransactionsByCashBox = async (
     if (filters.specificDate) params.specificDate = filters.specificDate;
     if (filters.startDate) params.startDate = filters.startDate;
     if (filters.endDate) params.endDate = filters.endDate;
+    if (filters.type && filters.type !== "all") params.type = filters.type;
+    if (filters.empleado && filters.empleado !== "all")
+      params.empleado = filters.empleado;
+    if (filters.sortOrder) params.sortOrder = filters.sortOrder;
 
     const response = await api.get<{
       transactions: BackendTransaction[];
@@ -170,20 +216,26 @@ export const getTransactionsByCashBox = async (
       };
     }>(`/cash/cashboxes/${cashBoxId}/transactions`, { params });
 
-    console.log(`✅ Transacciones obtenidas: ${response.data.transactions.length} registros`);
-    console.log(`📄 Paginación: Página ${response.data.pagination.page} de ${response.data.pagination.totalPages}`);
+    console.log(
+      `✅ Transacciones obtenidas: ${response.data.transactions.length} registros`
+    );
+    console.log(
+      `📄 Paginación: Página ${response.data.pagination.page} de ${response.data.pagination.totalPages}`
+    );
 
-    // Procesar las transacciones - MODIFICADO: NO formatear la fecha
-    const processedTransactions = response.data.transactions.map((transaction: BackendTransaction) => ({
-      idTransaccion: transaction.id,
-      cajaId: transaction.caja_id,
-      type: transaction.tipo,
-      description: transaction.descripcion,
-      amount: parseFloat(transaction.monto),
-      date: transaction.fecha, // DEJAR LA FECHA COMO VIENE DE LA BD
-      usuarioId: transaction.usuario_id,
-      empleadoNombre: transaction.empleado_nombre || `Usuario ${transaction.usuario_id}`
-    }));
+    const processedTransactions = response.data.transactions.map(
+      (transaction: BackendTransaction) => ({
+        idTransaccion: transaction.id,
+        cajaId: transaction.caja_id,
+        type: transaction.tipo,
+        description: transaction.descripcion,
+        amount: parseFloat(transaction.monto),
+        date: transaction.fecha, // Se deja tal cual viene de la BD
+        usuarioId: transaction.usuario_id,
+        empleadoNombre:
+          transaction.empleado_nombre || `Usuario ${transaction.usuario_id}`,
+      })
+    );
 
     return {
       transactions: processedTransactions,
@@ -191,45 +243,61 @@ export const getTransactionsByCashBox = async (
     };
   } catch (error: any) {
     console.error("❌ Error fetching transactions:", error);
-    
+
     if (error.response?.status === 400) {
       throw new Error(error.response.data.error || "Parámetros inválidos");
     }
-    
+
     throw new Error(
-      error.response?.data?.error || "No se pudieron cargar las transacciones",
+      error.response?.data?.error || "No se pudieron cargar las transacciones"
     );
   }
 };
 
-// NUEVA FUNCIÓN: Obtener totales del filtro (sin paginación)
-// Verificar que esta función en CashApi.ts esté bien
+// ============================================
+// TOTALES DE MOVIMIENTOS (mismos filtros, sin paginación)
+// ============================================
 export const getTotalTransactions = async (
-  params: any = {}
+  params: {
+    cashBoxId: number;
+    dateFilterType?: string;
+    specificDate?: string;
+    startDate?: string;
+    endDate?: string;
+    type?: TransactionTypeFilter;
+    empleado?: string;
+  }
 ): Promise<FilterTotals> => {
   try {
     console.log("📊 Obteniendo totales de transacciones con filtros:", params);
 
-    // Asegurar que cashBoxId sea string para URLSearchParams
     const searchParams = new URLSearchParams();
-    
-    if (params.cashBoxId) searchParams.append('cashBoxId', params.cashBoxId.toString());
-    if (params.dateFilterType) searchParams.append('dateFilterType', params.dateFilterType);
-    if (params.specificDate) searchParams.append('specificDate', params.specificDate);
-    if (params.startDate) searchParams.append('startDate', params.startDate);
-    if (params.endDate) searchParams.append('endDate', params.endDate);
 
-    const response = await api.get<FilterTotals>(`/cash/totals?${searchParams.toString()}`);
+    if (params.cashBoxId)
+      searchParams.append("cashBoxId", params.cashBoxId.toString());
+    if (params.dateFilterType)
+      searchParams.append("dateFilterType", params.dateFilterType);
+    if (params.specificDate)
+      searchParams.append("specificDate", params.specificDate);
+    if (params.startDate) searchParams.append("startDate", params.startDate);
+    if (params.endDate) searchParams.append("endDate", params.endDate);
+    if (params.type && params.type !== "all")
+      searchParams.append("type", params.type);
+    if (params.empleado && params.empleado !== "all")
+      searchParams.append("empleado", params.empleado);
+
+    const response = await api.get<FilterTotals>(
+      `/cash/totals?${searchParams.toString()}`
+    );
 
     console.log("✅ Totales de transacciones obtenidos:", response.data);
     return response.data;
   } catch (error: any) {
     console.error(
       "❌ Error fetching transaction totals:",
-      error.response?.data || error.message,
+      error.response?.data || error.message
     );
-    
-    // Retornar valores por defecto si hay error
+
     return {
       totalIngresos: 0,
       totalEgresos: 0,
@@ -238,10 +306,17 @@ export const getTotalTransactions = async (
   }
 };
 
-export const getLactobarTransactions = async (branchId: number): Promise<Transaction[]> => {
+// ============================================
+// MOVIMIENTOS DE LACTOBAR
+// ============================================
+export const getLactobarTransactions = async (
+  branchId: number
+): Promise<Transaction[]> => {
   try {
-    const response = await api.get<BackendTransaction[]>(`/cash/branches/${branchId}/lactobar/transactions`);
-    
+    const response = await api.get<BackendTransaction[]>(
+      `/cash/branches/${branchId}/lactobar/transactions`
+    );
+
     return response.data.map((transaction: BackendTransaction) => ({
       idTransaccion: transaction.id,
       cajaId: transaction.caja_id,
@@ -250,7 +325,8 @@ export const getLactobarTransactions = async (branchId: number): Promise<Transac
       amount: parseFloat(transaction.monto),
       date: transaction.fecha,
       usuarioId: transaction.usuario_id,
-      empleadoNombre: transaction.empleado_nombre || `Usuario ${transaction.usuario_id}`
+      empleadoNombre:
+        transaction.empleado_nombre || `Usuario ${transaction.usuario_id}`,
     }));
   } catch (error) {
     console.error("Error fetching lactobar transactions:", error);

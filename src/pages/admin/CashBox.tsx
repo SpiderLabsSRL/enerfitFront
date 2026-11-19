@@ -1,7 +1,12 @@
-// src/pages/admin/CashBox.tsx
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useSearchParams, useParams } from "react-router-dom";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -10,7 +15,7 @@ import {
   TableCell,
   TableHead,
   TableHeader,
-  TableRow
+  TableRow,
 } from "@/components/ui/table";
 import {
   Select,
@@ -19,7 +24,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import {
@@ -29,7 +38,7 @@ import {
   startOfMonth,
   endOfMonth,
   subWeeks,
-  subMonths
+  subMonths,
 } from "date-fns";
 import {
   TrendingUp,
@@ -48,7 +57,7 @@ import {
   Filter,
   CalendarIcon,
   ArrowUp,
-  ArrowDown
+  ArrowDown,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -59,45 +68,52 @@ import {
   getCashBoxStatus,
   TransactionsResponse,
   getTotalTransactions,
-  FilterTotals
+  FilterTotals,
+  TransactionTypeFilter,
+  SortOrder,
 } from "@/api/CashApi";
 import { cn } from "@/lib/utils";
 
 // ============================================
-// HOOK: detectar móvil
+// Calendario simple
 // ============================================
-function useIsMobile(breakpoint = 768) {
-  const [isMobile, setIsMobile] = useState<boolean>(() => {
-    if (typeof window === "undefined") return false;
-    return window.matchMedia(`(max-width: ${breakpoint - 1}px)`).matches;
-  });
-
-  useEffect(() => {
-    const mq = window.matchMedia(`(max-width: ${breakpoint - 1}px)`);
-    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
-    if (mq.addEventListener) mq.addEventListener("change", handler);
-    else mq.addListener(handler);
-    setIsMobile(mq.matches);
-    return () => {
-      if (mq.removeEventListener) mq.removeEventListener("change", handler);
-      else mq.removeListener(handler);
-    };
-  }, [breakpoint]);
-
-  return isMobile;
-}
-
-// Componente de calendario simple
-function SimpleCalendar({ selected, onSelect }: { selected?: Date; onSelect: (date: Date) => void }) {
+function SimpleCalendar({
+  selected,
+  onSelect,
+}: {
+  selected?: Date;
+  onSelect: (date: Date) => void;
+}) {
   const [currentDate, setCurrentDate] = useState(selected || new Date());
-  const months = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+  const months = [
+    "Enero",
+    "Febrero",
+    "Marzo",
+    "Abril",
+    "Mayo",
+    "Junio",
+    "Julio",
+    "Agosto",
+    "Septiembre",
+    "Octubre",
+    "Noviembre",
+    "Diciembre",
+  ];
   const weekDays = ["Do", "Lu", "Ma", "Mi", "Ju", "Vi", "Sa"];
 
-  const getDaysInMonth = (date: Date) => new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
-  const getFirstDayOfMonth = (date: Date) => new Date(date.getFullYear(), date.getMonth(), 1).getDay();
+  const getDaysInMonth = (date: Date) =>
+    new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+  const getFirstDayOfMonth = (date: Date) =>
+    new Date(date.getFullYear(), date.getMonth(), 1).getDay();
 
-  const handlePrevMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
-  const handleNextMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
+  const handlePrevMonth = () =>
+    setCurrentDate(
+      new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1)
+    );
+  const handleNextMonth = () =>
+    setCurrentDate(
+      new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1)
+    );
 
   const daysInMonth = getDaysInMonth(currentDate);
   const firstDay = getFirstDayOfMonth(currentDate);
@@ -108,18 +124,35 @@ function SimpleCalendar({ selected, onSelect }: { selected?: Date; onSelect: (da
 
   const isSelectedDate = (day: number) => {
     if (!selected) return false;
-    return selected.getDate() === day && selected.getMonth() === currentDate.getMonth() && selected.getFullYear() === currentDate.getFullYear();
+    return (
+      selected.getDate() === day &&
+      selected.getMonth() === currentDate.getMonth() &&
+      selected.getFullYear() === currentDate.getFullYear()
+    );
   };
 
   return (
     <div className="p-3">
       <div className="flex items-center justify-between mb-4">
-        <Button variant="outline" size="sm" onClick={handlePrevMonth}>{"<"}</Button>
-        <span className="font-medium">{months[currentDate.getMonth()]} {currentDate.getFullYear()}</span>
-        <Button variant="outline" size="sm" onClick={handleNextMonth}>{">"}</Button>
+        <Button variant="outline" size="sm" onClick={handlePrevMonth}>
+          {"<"}
+        </Button>
+        <span className="font-medium">
+          {months[currentDate.getMonth()]} {currentDate.getFullYear()}
+        </span>
+        <Button variant="outline" size="sm" onClick={handleNextMonth}>
+          {">"}
+        </Button>
       </div>
       <div className="grid grid-cols-7 gap-1 text-center mb-2">
-        {weekDays.map(day => <div key={day} className="text-xs font-medium text-muted-foreground">{day}</div>)}
+        {weekDays.map((day) => (
+          <div
+            key={day}
+            className="text-xs font-medium text-muted-foreground"
+          >
+            {day}
+          </div>
+        ))}
       </div>
       <div className="grid grid-cols-7 gap-1">
         {days.map((day, index) => (
@@ -128,12 +161,26 @@ function SimpleCalendar({ selected, onSelect }: { selected?: Date; onSelect: (da
               <Button
                 variant="ghost"
                 size="sm"
-                className={cn("h-8 w-8 p-0 font-normal", isSelectedDate(day) && "bg-primary text-primary-foreground hover:bg-primary/90")}
-                onClick={() => onSelect(new Date(currentDate.getFullYear(), currentDate.getMonth(), day))}
+                className={cn(
+                  "h-8 w-8 p-0 font-normal",
+                  isSelectedDate(day) &&
+                    "bg-primary text-primary-foreground hover:bg-primary/90"
+                )}
+                onClick={() =>
+                  onSelect(
+                    new Date(
+                      currentDate.getFullYear(),
+                      currentDate.getMonth(),
+                      day
+                    )
+                  )
+                }
               >
                 {day}
               </Button>
-            ) : <div className="h-8 w-8" />}
+            ) : (
+              <div className="h-8 w-8" />
+            )}
           </div>
         ))}
       </div>
@@ -141,117 +188,91 @@ function SimpleCalendar({ selected, onSelect }: { selected?: Date; onSelect: (da
   );
 }
 
-// Componente de tarjeta de resumen
-function SummaryCard({ title, amount, icon: Icon, iconColor = "text-primary", description }: {
-  title: string; amount: number; icon: any; iconColor?: string; description?: string;
+// ============================================
+// Tarjeta de resumen
+// ============================================
+function SummaryCard({
+  title,
+  amount,
+  icon: Icon,
+  iconColor = "text-primary",
+  description,
+}: {
+  title: string;
+  amount: number;
+  icon: any;
+  iconColor?: string;
+  description?: string;
 }) {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
+        <CardTitle className="text-sm font-medium text-muted-foreground">
+          {title}
+        </CardTitle>
         <Icon className={cn("h-4 w-4", iconColor)} />
       </CardHeader>
       <CardContent>
         <div className="text-2xl font-bold">
-          {new Intl.NumberFormat('es-BO', { style: 'currency', currency: 'BOB' }).format(amount)}
+          {new Intl.NumberFormat("es-BO", {
+            style: "currency",
+            currency: "BOB",
+          }).format(amount)}
         </div>
-        {description && <p className="text-xs text-muted-foreground mt-1">{description}</p>}
+        {description && (
+          <p className="text-xs text-muted-foreground mt-1">{description}</p>
+        )}
       </CardContent>
     </Card>
   );
 }
 
 // ============================================
-// CARD DE TRANSACCIÓN (MÓVIL)
+// Tipos locales
 // ============================================
-function TransactionCard({
-  transaction,
-  formatCurrency,
-  getTransactionTypeColor,
-  translateTransactionType,
-}: {
-  transaction: Transaction;
-  formatCurrency: (n: number) => string;
-  getTransactionTypeColor: (t: string) => string;
-  translateTransactionType: (t: string) => string;
-}) {
-  const esEntrada =
-    transaction.type === "ingreso" || transaction.type === "apertura";
-
-  return (
-    <Card className="overflow-hidden">
-      <CardContent className="p-3 space-y-2">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0 flex-1">
-            <p className="font-mono text-[10px] text-muted-foreground">
-              {transaction.date}
-            </p>
-            <Badge
-              className={cn(
-                "text-[10px] mt-1",
-                getTransactionTypeColor(transaction.type)
-              )}
-            >
-              {translateTransactionType(transaction.type)}
-            </Badge>
-          </div>
-          <span
-            className={cn(
-              "text-sm font-bold flex-shrink-0",
-              esEntrada ? "text-green-600" : "text-red-600"
-            )}
-          >
-            {esEntrada ? "+" : "-"}
-            {formatCurrency(transaction.amount)}
-          </span>
-        </div>
-
-        <div className="bg-muted/40 rounded-md p-2">
-          <p className="text-xs break-words">
-            {transaction.description || "—"}
-          </p>
-        </div>
-
-        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-          <User className="h-3 w-3" />
-          {transaction.empleadoNombre || `ID: ${transaction.usuarioId}`}
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-type DateFilterType = "today" | "yesterday" | "thisWeek" | "lastWeek" | "thisMonth" | "lastMonth" | "specific" | "range" | "all";
-type TransactionType = "all" | "ingreso" | "egreso" | "apertura" | "cierre";
-type SortOrder = "asc" | "desc";
+type DateFilterType =
+  | "today"
+  | "yesterday"
+  | "thisWeek"
+  | "lastWeek"
+  | "thisMonth"
+  | "lastMonth"
+  | "specific"
+  | "range"
+  | "all";
 
 export function CashBox() {
-  const isMobile = useIsMobile();
   const [searchParams] = useSearchParams();
   const { cashBoxId } = useParams<{ cashBoxId: string }>();
   const sucursalId = searchParams.get("sucursal") || "";
   const sucursalNombre = searchParams.get("sucursalNombre") || "principal";
   const cajaNombre = searchParams.get("caja") || "";
 
-  const [transactionsData, setTransactionsData] = useState<TransactionsResponse>({
-    transactions: [],
-    pagination: {
-      page: 1,
-      pageSize: 20,
-      total: 0,
-      totalPages: 0,
-    },
-  });
+  const [transactionsData, setTransactionsData] = useState<TransactionsResponse>(
+    {
+      transactions: [],
+      pagination: {
+        page: 1,
+        pageSize: 20,
+        total: 0,
+        totalPages: 0,
+      },
+    }
+  );
   const [cashBoxInfo, setCashBoxInfo] = useState<CashBoxType | null>(null);
-  const [cashBoxStatus, setCashBoxStatus] = useState<{montoFinal: number} | null>(null);
+  const [cashBoxStatus, setCashBoxStatus] = useState<{
+    montoFinal: number;
+  } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Estado de filtros
-  const [dateFilterType, setDateFilterType] = useState<DateFilterType>('today');
+  // --- Filtros ---
+  const [dateFilterType, setDateFilterType] =
+    useState<DateFilterType>("today");
   const [specificDate, setSpecificDate] = useState<Date>();
   const [startDate, setStartDate] = useState<Date>();
   const [endDate, setEndDate] = useState<Date>();
-  const [selectedType, setSelectedType] = useState<TransactionType>("all");
+  const [selectedType, setSelectedType] =
+    useState<TransactionTypeFilter>("all");
   const [selectedEmpleado, setSelectedEmpleado] = useState<string>("all");
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
   const [showFilters, setShowFilters] = useState(true);
@@ -270,168 +291,206 @@ export function CashBox() {
     totalCaja: 0,
   });
 
-  // Obtener empleados únicos de las transacciones actuales
-  const empleadosUnicos = useMemo(() => {
-    const empleadosMap = new Map<string, string>();
-    transactionsData.transactions.forEach(t => {
-      if (t.empleadoNombre && !empleadosMap.has(t.empleadoNombre)) {
-        empleadosMap.set(t.empleadoNombre, t.empleadoNombre);
+  // Cache acumulado de empleados vistos (para no perder opciones al filtrar)
+  const empleadosVistosRef = useRef<Set<string>>(new Set());
+  const [empleadosUnicosVersion, setEmpleadosUnicosVersion] = useState(0);
+
+  // Al llegar nuevas transacciones, agregamos los empleados al cache
+  useEffect(() => {
+    let changed = false;
+    transactionsData.transactions.forEach((t) => {
+      if (t.empleadoNombre && !empleadosVistosRef.current.has(t.empleadoNombre)) {
+        empleadosVistosRef.current.add(t.empleadoNombre);
+        changed = true;
       }
     });
-    return Array.from(empleadosMap, ([id, nombre]) => ({ id, nombre }));
+    if (changed) setEmpleadosUnicosVersion((v) => v + 1);
   }, [transactionsData.transactions]);
 
-  // Filtrar y ordenar transacciones localmente
-  const filteredTransactions = useMemo(() => {
-    let filtered = [...transactionsData.transactions];
+  // Lista de empleados para el Select (union de todos los vistos)
+  const empleadosUnicos = useMemo(() => {
+    // Aseguramos que se recalculen cuando cambia la versión
+    void empleadosUnicosVersion;
+    return Array.from(empleadosVistosRef.current)
+      .sort((a, b) => a.localeCompare(b))
+      .map((nombre) => ({ id: nombre, nombre }));
+  }, [empleadosUnicosVersion]);
 
-    if (selectedType !== "all") {
-      filtered = filtered.filter(t => t.type === selectedType);
-    }
+  // ============================================
+  // Construcción de parámetros de fecha (para backend)
+  // ============================================
+  const getDateParams = useCallback(
+    (filterType: DateFilterType) => {
+      const today = new Date();
 
-    if (selectedEmpleado !== "all") {
-      filtered = filtered.filter(t => t.empleadoNombre === selectedEmpleado);
-    }
-
-    filtered.sort((a, b) => {
-      const dateA = new Date(a.date).getTime();
-      const dateB = new Date(b.date).getTime();
-      return sortOrder === "asc" ? dateA - dateB : dateB - dateA;
-    });
-
-    return filtered;
-  }, [transactionsData.transactions, selectedType, selectedEmpleado, sortOrder]);
-
-  // Función para obtener parámetros de fecha
-  const getDateParams = useCallback((filterType: DateFilterType) => {
-    const today = new Date();
-
-    switch (filterType) {
-      case 'today':
-        return {
-          dateFilterType: 'specific',
-          specificDate: format(today, 'yyyy-MM-dd')
-        };
-      case 'yesterday':
-        const yesterday = new Date(today);
-        yesterday.setDate(yesterday.getDate() - 1);
-        return {
-          dateFilterType: 'specific',
-          specificDate: format(yesterday, 'yyyy-MM-dd')
-        };
-      case 'thisWeek':
-        return {
-          dateFilterType: 'range',
-          startDate: format(startOfWeek(today, { weekStartsOn: 1 }), 'yyyy-MM-dd'),
-          endDate: format(today, 'yyyy-MM-dd')
-        };
-      case 'lastWeek':
-        const lastWeekStart = startOfWeek(subWeeks(today, 1), { weekStartsOn: 1 });
-        const lastWeekEnd = endOfWeek(subWeeks(today, 1), { weekStartsOn: 1 });
-        return {
-          dateFilterType: 'range',
-          startDate: format(lastWeekStart, 'yyyy-MM-dd'),
-          endDate: format(lastWeekEnd, 'yyyy-MM-dd')
-        };
-      case 'thisMonth':
-        return {
-          dateFilterType: 'range',
-          startDate: format(startOfMonth(today), 'yyyy-MM-dd'),
-          endDate: format(today, 'yyyy-MM-dd')
-        };
-      case 'lastMonth':
-        const lastMonthStart = startOfMonth(subMonths(today, 1));
-        const lastMonthEnd = endOfMonth(subMonths(today, 1));
-        return {
-          dateFilterType: 'range',
-          startDate: format(lastMonthStart, 'yyyy-MM-dd'),
-          endDate: format(lastMonthEnd, 'yyyy-MM-dd')
-        };
-      case 'specific':
-        if (specificDate) {
+      switch (filterType) {
+        case "today":
           return {
-            dateFilterType: 'specific',
-            specificDate: format(specificDate, 'yyyy-MM-dd')
+            dateFilterType: "specific" as const,
+            specificDate: format(today, "yyyy-MM-dd"),
+          };
+        case "yesterday": {
+          const yesterday = new Date(today);
+          yesterday.setDate(yesterday.getDate() - 1);
+          return {
+            dateFilterType: "specific" as const,
+            specificDate: format(yesterday, "yyyy-MM-dd"),
           };
         }
-        break;
-      case 'range':
-        if (startDate && endDate) {
+        case "thisWeek":
           return {
-            dateFilterType: 'range',
-            startDate: format(startDate, 'yyyy-MM-dd'),
-            endDate: format(endDate, 'yyyy-MM-dd')
+            dateFilterType: "range" as const,
+            startDate: format(
+              startOfWeek(today, { weekStartsOn: 1 }),
+              "yyyy-MM-dd"
+            ),
+            endDate: format(today, "yyyy-MM-dd"),
+          };
+        case "lastWeek": {
+          const lastWeekStart = startOfWeek(subWeeks(today, 1), {
+            weekStartsOn: 1,
+          });
+          const lastWeekEnd = endOfWeek(subWeeks(today, 1), {
+            weekStartsOn: 1,
+          });
+          return {
+            dateFilterType: "range" as const,
+            startDate: format(lastWeekStart, "yyyy-MM-dd"),
+            endDate: format(lastWeekEnd, "yyyy-MM-dd"),
           };
         }
-        break;
-      case 'all':
-      default:
-        return {
-          dateFilterType: 'all'
-        };
+        case "thisMonth":
+          return {
+            dateFilterType: "range" as const,
+            startDate: format(startOfMonth(today), "yyyy-MM-dd"),
+            endDate: format(today, "yyyy-MM-dd"),
+          };
+        case "lastMonth": {
+          const lastMonthStart = startOfMonth(subMonths(today, 1));
+          const lastMonthEnd = endOfMonth(subMonths(today, 1));
+          return {
+            dateFilterType: "range" as const,
+            startDate: format(lastMonthStart, "yyyy-MM-dd"),
+            endDate: format(lastMonthEnd, "yyyy-MM-dd"),
+          };
+        }
+        case "specific":
+          if (specificDate) {
+            return {
+              dateFilterType: "specific" as const,
+              specificDate: format(specificDate, "yyyy-MM-dd"),
+            };
+          }
+          break;
+        case "range":
+          if (startDate && endDate) {
+            return {
+              dateFilterType: "range" as const,
+              startDate: format(startDate, "yyyy-MM-dd"),
+              endDate: format(endDate, "yyyy-MM-dd"),
+            };
+          }
+          break;
+        case "all":
+        default:
+          return { dateFilterType: "all" as const };
+      }
+
+      return { dateFilterType: "all" as const };
+    },
+    [specificDate, startDate, endDate]
+  );
+
+  // ============================================
+  // Filtros completos (fecha + tipo + empleado + orden)
+  // ============================================
+  const buildFullFilters = useCallback(() => {
+    const dateParams = getDateParams(dateFilterType);
+
+    // Validación: si es specific/range y faltan fechas, caemos a "all"
+    let normalized = { ...dateParams };
+    if (
+      (normalized.dateFilterType === "specific" && !normalized.specificDate) ||
+      (normalized.dateFilterType === "range" &&
+        (!normalized.startDate || !normalized.endDate))
+    ) {
+      normalized = { dateFilterType: "all" as const };
     }
 
     return {
-      dateFilterType: 'all'
+      ...normalized,
+      type: selectedType,
+      empleado: selectedEmpleado,
+      sortOrder,
     };
-  }, [specificDate, startDate, endDate]);
+  }, [
+    getDateParams,
+    dateFilterType,
+    selectedType,
+    selectedEmpleado,
+    sortOrder,
+  ]);
 
-  // Cargar totales
+  // ============================================
+  // Cargar totales (con TODOS los filtros)
+  // ============================================
   const cargarTotalesFiltro = useCallback(async () => {
     try {
       if (!cashBoxId || !sucursalId) return;
 
-      const dateParams = getDateParams(dateFilterType);
-      const params: any = {
+      const filters = buildFullFilters();
+      const totals = await getTotalTransactions({
         cashBoxId: parseInt(cashBoxId),
-        ...dateParams
-      };
-
-      const totals = await getTotalTransactions(params);
+        ...filters,
+      });
       setFilterTotals(totals);
     } catch (err: any) {
       console.error("Error cargando totales:", err);
       setFilterTotals({ totalIngresos: 0, totalEgresos: 0, totalCaja: 0 });
     }
-  }, [cashBoxId, sucursalId, dateFilterType, getDateParams]);
+  }, [cashBoxId, sucursalId, buildFullFilters]);
 
-  // Cargar transacciones
-  const cargarTransacciones = async (page: number = 1) => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      setCurrentPage(page);
-      setGoToPageInput("");
+  // ============================================
+  // Cargar transacciones (con TODOS los filtros + paginación)
+  // ============================================
+  const cargarTransacciones = useCallback(
+    async (page: number = 1) => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        setCurrentPage(page);
+        setGoToPageInput("");
 
-      const dateParams: any = getDateParams(dateFilterType);
+        const filters = buildFullFilters();
 
-      if ((dateParams.dateFilterType === 'specific' && !dateParams.specificDate) ||
-          (dateParams.dateFilterType === 'range' && (!dateParams.startDate || !dateParams.endDate))) {
-        dateParams.dateFilterType = 'all';
+        const response = await getTransactionsByCashBox(
+          parseInt(cashBoxId || "0"),
+          filters,
+          page,
+          pageSize
+        );
+        setTransactionsData(response);
+      } catch (err: any) {
+        console.error("Error loading transactions:", err);
+        setError(err.message || "No se pudieron cargar las transacciones.");
+        toast.error("Error al cargar las transacciones");
+      } finally {
+        setIsLoading(false);
       }
+    },
+    [cashBoxId, pageSize, buildFullFilters]
+  );
 
-      const params: any = {
-        page,
-        pageSize,
-        ...dateParams
-      };
-
-      const response = await getTransactionsByCashBox(parseInt(cashBoxId || "0"), params, page, pageSize);
-      setTransactionsData(response);
-    } catch (err: any) {
-      console.error("Error loading transactions:", err);
-      setError(err.message || "No se pudieron cargar las transacciones.");
-      toast.error("Error al cargar las transacciones");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const cargarInformacionCaja = async () => {
+  // ============================================
+  // Cargar info de caja
+  // ============================================
+  const cargarInformacionCaja = useCallback(async () => {
     try {
       if (sucursalId && cashBoxId) {
         const cashBoxes = await getCashBoxesByBranch(parseInt(sucursalId));
-        const currentCashBox = cashBoxes.find(c => c.idCaja.toString() === cashBoxId);
+        const currentCashBox = cashBoxes.find(
+          (c) => c.idCaja.toString() === cashBoxId
+        );
         setCashBoxInfo(currentCashBox || null);
 
         const status = await getCashBoxStatus(parseInt(cashBoxId));
@@ -441,15 +500,15 @@ export function CashBox() {
       console.error("Error loading cash box info:", error);
       toast.error("No se pudo cargar la información de la caja");
     }
-  };
+  }, [sucursalId, cashBoxId]);
 
-  const cargarTodo = async () => {
+  const cargarTodo = useCallback(async () => {
     await cargarInformacionCaja();
     await cargarTotalesFiltro();
     await cargarTransacciones(1);
-  };
+  }, [cargarInformacionCaja, cargarTotalesFiltro, cargarTransacciones]);
 
-  // Cargar datos iniciales
+  // Carga inicial
   useEffect(() => {
     if (sucursalId && cashBoxId) {
       cargarTodo();
@@ -457,7 +516,7 @@ export function CashBox() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sucursalId, cashBoxId]);
 
-  // Cuando cambian los filtros de fecha, recargar datos desde el servidor
+  // Recarga cuando cambia cualquier filtro
   useEffect(() => {
     if (sucursalId && cashBoxId) {
       setCurrentPage(1);
@@ -465,8 +524,19 @@ export function CashBox() {
       cargarTransacciones(1);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dateFilterType, specificDate, startDate, endDate]);
+  }, [
+    dateFilterType,
+    specificDate,
+    startDate,
+    endDate,
+    selectedType,
+    selectedEmpleado,
+    sortOrder,
+  ]);
 
+  // ============================================
+  // Handlers
+  // ============================================
   const limpiarFiltros = () => {
     setDateFilterType("today");
     setSpecificDate(undefined);
@@ -479,62 +549,92 @@ export function CashBox() {
   };
 
   const toggleSortOrder = () => {
-    setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+    setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"));
   };
 
   const handleGoToPage = () => {
     const pageNumber = parseInt(goToPageInput);
-    if (!isNaN(pageNumber) && pageNumber >= 1 && pageNumber <= (transactionsData.pagination.totalPages || 1)) {
+    if (
+      !isNaN(pageNumber) &&
+      pageNumber >= 1 &&
+      pageNumber <= (transactionsData.pagination.totalPages || 1)
+    ) {
       cargarTransacciones(pageNumber);
     }
     setGoToPageInput("");
   };
 
-  const isLactobar = cashBoxInfo?.nombre.toLowerCase().includes('lactobar') ||
-                     cajaNombre.toLowerCase().includes('lactobar');
+  // ============================================
+  // Helpers visuales
+  // ============================================
+  const isLactobar =
+    cashBoxInfo?.nombre.toLowerCase().includes("lactobar") ||
+    cajaNombre.toLowerCase().includes("lactobar");
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-BO', {
-      style: 'currency',
-      currency: 'BOB'
+    return new Intl.NumberFormat("es-BO", {
+      style: "currency",
+      currency: "BOB",
     }).format(amount);
   };
 
   const translateTransactionType = (type: string) => {
     const types: { [key: string]: string } = {
-      'ingreso': 'Ingreso',
-      'egreso': 'Egreso',
-      'apertura': 'Apertura',
-      'cierre': 'Cierre'
+      ingreso: "Ingreso",
+      egreso: "Egreso",
+      apertura: "Apertura",
+      cierre: "Cierre",
     };
     return types[type] || type;
   };
 
   const getTransactionTypeColor = (type: string) => {
     switch (type) {
-      case 'ingreso': return 'bg-green-100 text-green-800 border-green-200';
-      case 'egreso': return 'bg-red-100 text-red-800 border-red-200';
-      case 'apertura': return 'bg-green-100 text-green-800 border-green-200';
-      case 'cierre': return 'bg-red-100 text-red-800 border-red-200';
-      default: return 'bg-gray-100 text-gray-800';
+      case "ingreso":
+        return "bg-green-100 text-green-800 border-green-200";
+      case "egreso":
+        return "bg-red-100 text-red-800 border-red-200";
+      case "apertura":
+        return "bg-green-100 text-green-800 border-green-200";
+      case "cierre":
+        return "bg-red-100 text-red-800 border-red-200";
+      default:
+        return "bg-gray-100 text-gray-800";
     }
   };
 
   const getFilterDescription = () => {
     switch (dateFilterType) {
-      case 'today': return "Hoy";
-      case 'yesterday': return "Ayer";
-      case 'thisWeek': return "Esta semana";
-      case 'lastWeek': return "Semana pasada";
-      case 'thisMonth': return "Este mes";
-      case 'lastMonth': return "Mes pasado";
-      case 'specific': return specificDate ? format(specificDate, 'dd/MM/yyyy') : "Fecha específica";
-      case 'range': return startDate && endDate ? `${format(startDate, 'dd/MM')} - ${format(endDate, 'dd/MM/yyyy')}` : "Rango";
-      case 'all': return "Todos";
-      default: return "Seleccionar";
+      case "today":
+        return "Hoy";
+      case "yesterday":
+        return "Ayer";
+      case "thisWeek":
+        return "Esta semana";
+      case "lastWeek":
+        return "Semana pasada";
+      case "thisMonth":
+        return "Este mes";
+      case "lastMonth":
+        return "Mes pasado";
+      case "specific":
+        return specificDate
+          ? format(specificDate, "dd/MM/yyyy")
+          : "Fecha específica";
+      case "range":
+        return startDate && endDate
+          ? `${format(startDate, "dd/MM")} - ${format(endDate, "dd/MM/yyyy")}`
+          : "Rango";
+      case "all":
+        return "Todos";
+      default:
+        return "Seleccionar";
     }
   };
 
+  // ============================================
+  // Paginación
+  // ============================================
   const PaginationControls = () => {
     const { page, total, totalPages } = transactionsData.pagination;
 
@@ -543,7 +643,8 @@ export function CashBox() {
     return (
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-t pt-4 mt-4">
         <div className="text-sm text-muted-foreground order-2 sm:order-1">
-          Mostrando {filteredTransactions.length} de {total} transacciones
+          Mostrando {transactionsData.transactions.length} de {total}{" "}
+          transacciones
         </div>
 
         <div className="flex flex-wrap items-center justify-center gap-2 order-1 sm:order-2">
@@ -575,7 +676,7 @@ export function CashBox() {
               max={totalPages}
               value={goToPageInput}
               onChange={(e) => setGoToPageInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleGoToPage()}
+              onKeyDown={(e) => e.key === "Enter" && handleGoToPage()}
               className="w-16 h-8 text-center text-sm"
               placeholder={page.toString()}
             />
@@ -615,6 +716,9 @@ export function CashBox() {
     );
   };
 
+  // ============================================
+  // Render
+  // ============================================
   if (isLoading && !transactionsData.transactions.length) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -630,7 +734,9 @@ export function CashBox() {
         <div>
           <div className="flex items-center gap-2 mb-1">
             <Building2 className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm text-muted-foreground capitalize">{sucursalNombre}</span>
+            <span className="text-sm text-muted-foreground capitalize">
+              {sucursalNombre}
+            </span>
           </div>
           <div className="flex items-center gap-2">
             {isLactobar ? (
@@ -638,7 +744,9 @@ export function CashBox() {
             ) : (
               <Wallet className="h-6 w-6 text-primary" />
             )}
-            <h1 className="text-xl md:text-2xl font-bold text-primary">Caja {cashBoxInfo?.nombre || cajaNombre}</h1>
+            <h1 className="text-xl md:text-2xl font-bold text-primary">
+              Caja {cashBoxInfo?.nombre || cajaNombre}
+            </h1>
           </div>
           <p className="text-xs md:text-sm text-muted-foreground">
             {isLactobar
@@ -647,26 +755,43 @@ export function CashBox() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => setShowFilters(!showFilters)} className="h-8 md:h-9">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowFilters(!showFilters)}
+            className="h-8 md:h-9"
+          >
             <Filter className="h-3 w-3 md:h-4 md:w-4 mr-1 md:mr-2" />
             <span className="text-xs md:text-sm">Filtros</span>
           </Button>
-          <Button variant="outline" size="sm" onClick={cargarTodo} className="h-8 md:h-9">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={cargarTodo}
+            className="h-8 md:h-9"
+          >
             <RefreshCw className="h-3 w-3 md:h-4 md:w-4 mr-1 md:mr-2" />
             <span className="text-xs md:text-sm">Recargar</span>
           </Button>
         </div>
       </div>
 
-      {/* Panel de Filtros */}
+      {/* Panel de filtros */}
       {showFilters && (
         <Card>
           <CardContent className="p-3 md:p-4">
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2 md:gap-3">
-              {/* Filtro de Período */}
+              {/* Período */}
               <div className="space-y-1">
-                <Label className="text-[10px] md:text-xs text-muted-foreground">Período</Label>
-                <Select value={dateFilterType} onValueChange={(v) => setDateFilterType(v as DateFilterType)}>
+                <Label className="text-[10px] md:text-xs text-muted-foreground">
+                  Período
+                </Label>
+                <Select
+                  value={dateFilterType}
+                  onValueChange={(v) =>
+                    setDateFilterType(v as DateFilterType)
+                  }
+                >
                   <SelectTrigger className="h-8 md:h-9 text-xs md:text-sm">
                     <SelectValue />
                   </SelectTrigger>
@@ -684,62 +809,114 @@ export function CashBox() {
                 </Select>
               </div>
 
-              {/* Filtro de Fecha Específica */}
+              {/* Fecha específica */}
               {dateFilterType === "specific" && (
                 <div className="space-y-1">
-                  <Label className="text-[10px] md:text-xs text-muted-foreground">Fecha</Label>
-                  <Popover open={specificDateOpen} onOpenChange={setSpecificDateOpen}>
+                  <Label className="text-[10px] md:text-xs text-muted-foreground">
+                    Fecha
+                  </Label>
+                  <Popover
+                    open={specificDateOpen}
+                    onOpenChange={setSpecificDateOpen}
+                  >
                     <PopoverTrigger asChild>
-                      <Button variant="outline" className="w-full justify-start h-8 md:h-9 text-xs md:text-sm">
+                      <Button
+                        variant="outline"
+                        className="w-full justify-start h-8 md:h-9 text-xs md:text-sm"
+                      >
                         <CalendarIcon className="mr-1 h-3 w-3" />
-                        {specificDate ? format(specificDate, "dd/MM/yyyy") : "Seleccionar"}
+                        {specificDate
+                          ? format(specificDate, "dd/MM/yyyy")
+                          : "Seleccionar"}
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0">
-                      <SimpleCalendar selected={specificDate} onSelect={(d) => { setSpecificDate(d); setSpecificDateOpen(false); }} />
+                      <SimpleCalendar
+                        selected={specificDate}
+                        onSelect={(d) => {
+                          setSpecificDate(d);
+                          setSpecificDateOpen(false);
+                        }}
+                      />
                     </PopoverContent>
                   </Popover>
                 </div>
               )}
 
-              {/* Filtro de Rango */}
+              {/* Rango */}
               {dateFilterType === "range" && (
                 <>
                   <div className="space-y-1">
-                    <Label className="text-[10px] md:text-xs text-muted-foreground">Desde</Label>
-                    <Popover open={startDateOpen} onOpenChange={setStartDateOpen}>
+                    <Label className="text-[10px] md:text-xs text-muted-foreground">
+                      Desde
+                    </Label>
+                    <Popover
+                      open={startDateOpen}
+                      onOpenChange={setStartDateOpen}
+                    >
                       <PopoverTrigger asChild>
-                        <Button variant="outline" className="w-full justify-start h-8 md:h-9 text-xs md:text-sm">
+                        <Button
+                          variant="outline"
+                          className="w-full justify-start h-8 md:h-9 text-xs md:text-sm"
+                        >
                           <CalendarIcon className="mr-1 h-3 w-3" />
-                          {startDate ? format(startDate, "dd/MM/yyyy") : "Seleccionar"}
+                          {startDate
+                            ? format(startDate, "dd/MM/yyyy")
+                            : "Seleccionar"}
                         </Button>
                       </PopoverTrigger>
                       <PopoverContent className="w-auto p-0">
-                        <SimpleCalendar selected={startDate} onSelect={(d) => { setStartDate(d); setStartDateOpen(false); }} />
+                        <SimpleCalendar
+                          selected={startDate}
+                          onSelect={(d) => {
+                            setStartDate(d);
+                            setStartDateOpen(false);
+                          }}
+                        />
                       </PopoverContent>
                     </Popover>
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-[10px] md:text-xs text-muted-foreground">Hasta</Label>
+                    <Label className="text-[10px] md:text-xs text-muted-foreground">
+                      Hasta
+                    </Label>
                     <Popover open={endDateOpen} onOpenChange={setEndDateOpen}>
                       <PopoverTrigger asChild>
-                        <Button variant="outline" className="w-full justify-start h-8 md:h-9 text-xs md:text-sm">
+                        <Button
+                          variant="outline"
+                          className="w-full justify-start h-8 md:h-9 text-xs md:text-sm"
+                        >
                           <CalendarIcon className="mr-1 h-3 w-3" />
-                          {endDate ? format(endDate, "dd/MM/yyyy") : "Seleccionar"}
+                          {endDate
+                            ? format(endDate, "dd/MM/yyyy")
+                            : "Seleccionar"}
                         </Button>
                       </PopoverTrigger>
                       <PopoverContent className="w-auto p-0">
-                        <SimpleCalendar selected={endDate} onSelect={(d) => { setEndDate(d); setEndDateOpen(false); }} />
+                        <SimpleCalendar
+                          selected={endDate}
+                          onSelect={(d) => {
+                            setEndDate(d);
+                            setEndDateOpen(false);
+                          }}
+                        />
                       </PopoverContent>
                     </Popover>
                   </div>
                 </>
               )}
 
-              {/* Filtro por Tipo */}
+              {/* Tipo */}
               <div className="space-y-1">
-                <Label className="text-[10px] md:text-xs text-muted-foreground">Tipo</Label>
-                <Select value={selectedType} onValueChange={(v) => setSelectedType(v as TransactionType)}>
+                <Label className="text-[10px] md:text-xs text-muted-foreground">
+                  Tipo
+                </Label>
+                <Select
+                  value={selectedType}
+                  onValueChange={(v) =>
+                    setSelectedType(v as TransactionTypeFilter)
+                  }
+                >
                   <SelectTrigger className="h-8 md:h-9 text-xs md:text-sm">
                     <SelectValue placeholder="Todos" />
                   </SelectTrigger>
@@ -753,18 +930,25 @@ export function CashBox() {
                 </Select>
               </div>
 
-              {/* Filtro por Empleado */}
+              {/* Empleado */}
               {empleadosUnicos.length > 0 && (
                 <div className="space-y-1">
-                  <Label className="text-[10px] md:text-xs text-muted-foreground">Empleado</Label>
-                  <Select value={selectedEmpleado} onValueChange={setSelectedEmpleado}>
+                  <Label className="text-[10px] md:text-xs text-muted-foreground">
+                    Empleado
+                  </Label>
+                  <Select
+                    value={selectedEmpleado}
+                    onValueChange={setSelectedEmpleado}
+                  >
                     <SelectTrigger className="h-8 md:h-9 text-xs md:text-sm">
                       <SelectValue placeholder="Todos" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Todos</SelectItem>
-                      {empleadosUnicos.map(e => (
-                        <SelectItem key={e.id} value={e.id}>{e.nombre}</SelectItem>
+                      {empleadosUnicos.map((e) => (
+                        <SelectItem key={e.id} value={e.id}>
+                          {e.nombre}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -773,20 +957,42 @@ export function CashBox() {
             </div>
 
             {/* Indicador de filtros activos */}
-            {(dateFilterType !== "all" || selectedType !== "all" || selectedEmpleado !== "all") && (
+            {(dateFilterType !== "all" ||
+              selectedType !== "all" ||
+              selectedEmpleado !== "all") && (
               <div className="mt-3 pt-2 text-[10px] md:text-xs text-muted-foreground border-t flex flex-wrap items-center gap-1">
                 <span>Filtros activos:</span>
                 <span>{getFilterDescription()}</span>
-                {selectedType !== "all" && <span>• Tipo: {selectedType === "ingreso" ? "Ingresos" : selectedType === "egreso" ? "Egresos" : selectedType === "apertura" ? "Aperturas" : "Cierres"}</span>}
-                {selectedEmpleado !== "all" && <span>• Empleado: {selectedEmpleado}</span>}
-                <Button variant="ghost" size="sm" onClick={limpiarFiltros} className="h-5 px-2 text-[10px] md:text-xs">Limpiar</Button>
+                {selectedType !== "all" && (
+                  <span>
+                    • Tipo:{" "}
+                    {selectedType === "ingreso"
+                      ? "Ingresos"
+                      : selectedType === "egreso"
+                      ? "Egresos"
+                      : selectedType === "apertura"
+                      ? "Aperturas"
+                      : "Cierres"}
+                  </span>
+                )}
+                {selectedEmpleado !== "all" && (
+                  <span>• Empleado: {selectedEmpleado}</span>
+                )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={limpiarFiltros}
+                  className="h-5 px-2 text-[10px] md:text-xs"
+                >
+                  Limpiar
+                </Button>
               </div>
             )}
           </CardContent>
         </Card>
       )}
 
-      {/* Tarjetas de Resumen */}
+      {/* Tarjetas de resumen */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
         <SummaryCard
           title="Total en Caja"
@@ -810,7 +1016,7 @@ export function CashBox() {
         />
       </div>
 
-      {/* Transacciones */}
+      {/* Tabla de transacciones */}
       <Card>
         <CardHeader className="pb-2">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
@@ -818,135 +1024,210 @@ export function CashBox() {
               <CardTitle className="text-sm md:text-base flex items-center gap-2">
                 Detalle de Transacciones
                 <Badge variant="secondary" className="text-[10px] md:text-xs">
-                  {filteredTransactions.length} registros
+                  {transactionsData.pagination.total} registros
                 </Badge>
               </CardTitle>
               <CardDescription className="text-[10px] md:text-xs">
-                Página {transactionsData.pagination.page} de {transactionsData.pagination.totalPages || 1}
+                Página {transactionsData.pagination.page} de{" "}
+                {transactionsData.pagination.totalPages || 1}
               </CardDescription>
             </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={toggleSortOrder}
+              className="md:hidden h-8 text-xs self-start"
+            >
+              {sortOrder === "desc" ? (
+                <>
+                  <ArrowDown className="h-3 w-3 mr-1" /> Más recientes
+                </>
+              ) : (
+                <>
+                  <ArrowUp className="h-3 w-3 mr-1" /> Más antiguas
+                </>
+              )}
+            </Button>
           </div>
         </CardHeader>
         <CardContent>
           {error ? (
             <div className="text-center py-8 text-destructive">{error}</div>
-          ) : filteredTransactions.length === 0 ? (
+          ) : transactionsData.transactions.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               No hay transacciones para los filtros seleccionados
             </div>
           ) : (
             <>
-              {isMobile ? (
-                /* ✅ MÓVIL: cards apiladas */
-                <div className="space-y-2.5">
-                  {filteredTransactions.map((transaction) => (
-                    <TransactionCard
-                      key={transaction.idTransaccion}
-                      transaction={transaction}
-                      formatCurrency={formatCurrency}
-                      getTransactionTypeColor={getTransactionTypeColor}
-                      translateTransactionType={translateTransactionType}
-                    />
-                  ))}
-                </div>
-              ) : (
-                /* DESKTOP: tabla */
-                <div className="overflow-x-auto custom-scrollbar">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="bg-muted/50">
-                        <TableHead className="min-w-[100px] text-xs">
-                          <div className="flex items-center gap-1">
-                            Fecha
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={toggleSortOrder}
-                              className="h-6 w-6 p-0 -mr-2"
-                            >
-                              {sortOrder === "desc" ? (
-                                <ArrowDown className="h-3 w-3" />
-                              ) : (
-                                <ArrowUp className="h-3 w-3" />
-                              )}
-                            </Button>
-                          </div>
-                        </TableHead>
-                        <TableHead className="min-w-[90px] text-xs">Tipo</TableHead>
-                        <TableHead className="min-w-[180px] text-xs">Descripción</TableHead>
-                        <TableHead className="min-w-[120px] text-xs">Empleado</TableHead>
-                        <TableHead className="min-w-[100px] text-right text-xs">Monto</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredTransactions.map((transaction) => (
-                        <TableRow key={transaction.idTransaccion}>
-                          <TableCell className="font-mono text-xs">
+              {/* Vista móvil: cards */}
+              <div className="md:hidden space-y-3">
+                {transactionsData.transactions.map((transaction) => {
+                  const isPositive =
+                    transaction.type === "ingreso" ||
+                    transaction.type === "apertura";
+                  return (
+                    <div
+                      key={`card-${transaction.idTransaccion}`}
+                      className="border rounded-lg p-3 space-y-2 bg-card"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <p className="font-mono text-[10px] text-muted-foreground">
                             {transaction.date}
-                          </TableCell>
-                          <TableCell>
-                            <Badge className={cn("text-xs", getTransactionTypeColor(transaction.type))}>
-                              {translateTransactionType(transaction.type)}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-xs max-w-[200px] break-words">
-                            {transaction.description}
-                          </TableCell>
-                          <TableCell className="text-xs">
-                            <div className="flex items-center gap-1">
-                              <User className="h-3 w-3 text-muted-foreground" />
-                              {transaction.empleadoNombre || `ID: ${transaction.usuarioId}`}
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <span className={cn(
+                          </p>
+                          <Badge
+                            className={cn(
+                              "text-[10px] mt-1",
+                              getTransactionTypeColor(transaction.type)
+                            )}
+                          >
+                            {translateTransactionType(transaction.type)}
+                          </Badge>
+                        </div>
+                        <span
+                          className={cn(
+                            "text-sm font-bold flex-shrink-0",
+                            isPositive ? "text-green-600" : "text-red-600"
+                          )}
+                        >
+                          {isPositive ? "+" : "-"}
+                          {formatCurrency(transaction.amount)}
+                        </span>
+                      </div>
+
+                      <div className="border-t pt-2">
+                        <p className="text-[10px] uppercase text-muted-foreground font-medium mb-1">
+                          Descripción
+                        </p>
+                        <p className="text-xs break-words">
+                          {transaction.description}
+                        </p>
+                      </div>
+
+                      <div className="border-t pt-2 flex items-center gap-1 text-xs text-muted-foreground">
+                        <User className="h-3 w-3 flex-shrink-0" />
+                        <span className="truncate">
+                          {transaction.empleadoNombre ||
+                            `ID: ${transaction.usuarioId}`}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Vista desktop: tabla */}
+              <div className="hidden md:block overflow-x-auto custom-scrollbar">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/50">
+                      <TableHead className="min-w-[100px] text-xs">
+                        <div className="flex items-center gap-1">
+                          Fecha
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={toggleSortOrder}
+                            className="h-6 w-6 p-0 -mr-2"
+                          >
+                            {sortOrder === "desc" ? (
+                              <ArrowDown className="h-3 w-3" />
+                            ) : (
+                              <ArrowUp className="h-3 w-3" />
+                            )}
+                          </Button>
+                        </div>
+                      </TableHead>
+                      <TableHead className="min-w-[90px] text-xs">
+                        Tipo
+                      </TableHead>
+                      <TableHead className="min-w-[180px] text-xs">
+                        Descripción
+                      </TableHead>
+                      <TableHead className="min-w-[120px] text-xs">
+                        Empleado
+                      </TableHead>
+                      <TableHead className="min-w-[100px] text-right text-xs">
+                        Monto
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {transactionsData.transactions.map((transaction) => (
+                      <TableRow key={transaction.idTransaccion}>
+                        <TableCell className="font-mono text-xs">
+                          {transaction.date}
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            className={cn(
+                              "text-xs",
+                              getTransactionTypeColor(transaction.type)
+                            )}
+                          >
+                            {translateTransactionType(transaction.type)}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-xs max-w-[200px] break-words">
+                          {transaction.description}
+                        </TableCell>
+                        <TableCell className="text-xs">
+                          <div className="flex items-center gap-1">
+                            <User className="h-3 w-3 text-muted-foreground" />
+                            {transaction.empleadoNombre ||
+                              `ID: ${transaction.usuarioId}`}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <span
+                            className={cn(
                               "text-xs font-medium",
-                              transaction.type === 'ingreso' || transaction.type === 'apertura'
-                                ? 'text-green-600'
-                                : 'text-red-600'
-                            )}>
-                              {transaction.type === 'ingreso' || transaction.type === 'apertura' ? '+' : '-'}
-                              {formatCurrency(transaction.amount)}
-                            </span>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
+                              transaction.type === "ingreso" ||
+                                transaction.type === "apertura"
+                                ? "text-green-600"
+                                : "text-red-600"
+                            )}
+                          >
+                            {transaction.type === "ingreso" ||
+                            transaction.type === "apertura"
+                              ? "+"
+                              : "-"}
+                            {formatCurrency(transaction.amount)}
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
               <PaginationControls />
             </>
           )}
         </CardContent>
       </Card>
 
-      {/* Estilos para scrollbar */}
+      {/* Estilos scrollbar */}
       <style>{`
         .custom-scrollbar {
           scrollbar-width: thin;
           scrollbar-color: hsl(var(--muted-foreground)) hsl(var(--card));
         }
-
         .custom-scrollbar::-webkit-scrollbar {
           width: 6px;
           height: 6px;
         }
-
         .custom-scrollbar::-webkit-scrollbar-track {
           background: hsl(var(--card));
           border-radius: 3px;
         }
-
         .custom-scrollbar::-webkit-scrollbar-thumb {
           background: hsl(var(--muted-foreground) / 0.3);
           border-radius: 3px;
         }
-
         .custom-scrollbar::-webkit-scrollbar-thumb:hover {
           background: hsl(var(--muted-foreground) / 0.5);
         }
-
         input[type="number"]::-webkit-inner-spin-button,
         input[type="number"]::-webkit-outer-spin-button {
           opacity: 0.5;
