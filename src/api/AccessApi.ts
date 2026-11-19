@@ -1,4 +1,3 @@
-
 import axios from "axios";
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
@@ -64,6 +63,7 @@ interface BackendClient extends BackendPerson {
 interface BackendEmployeeMember extends BackendPerson {
   tipo: "empleado";
   empleado_info: BackendEmployee;
+  servicios?: BackendService[];
 }
 
 type BackendMember = BackendClient | BackendEmployeeMember;
@@ -328,7 +328,7 @@ const mapBackendMember = (member: BackendMember): ApiMember => {
   } else {
     return {
       ...baseMember,
-      services: [],
+      services: (member.servicios || []).map(mapBackendService),
       employeeInfo: mapBackendEmployee(member.empleado_info, member),
     };
   }

@@ -573,7 +573,7 @@ export function AccessControlAdmin() {
   };
 
   const handleRegisterAccess = async (member: ApiMember, service?: any) => {
-    if (member.memberType === "client") {
+    if (member.memberType === "client" || member.employeeInfo?.rol === "couch") {
       if (!service) {
         toast({
           title: "Error",
@@ -604,7 +604,7 @@ export function AccessControlAdmin() {
         if (result.success) {
           setMembers((prev) =>
             prev.map((m) =>
-              m.id === member.id && m.memberType === "client"
+              m.id === member.id && m.memberType === member.memberType
                 ? {
                     ...m,
                     services: m.services.map((s) =>
@@ -619,7 +619,7 @@ export function AccessControlAdmin() {
 
           toast({
             title: "Acceso Registrado",
-            description: `${member.name} - ${service.name}. ${result.message}`,
+            description: `${member.name} - ${service.name}. ${result.message}${member.employeeInfo?.rol === "couch" ? ` · Accesos restantes: ${result.remainingVisits ?? "Ilimitado"}` : ""}`,
           });
 
           if (result.tieneDeuda && result.deudaInfo) {
@@ -1151,7 +1151,7 @@ export function AccessControlAdmin() {
                         <div className="text-xs md:text-sm text-muted-foreground">
                           CI: {member.ci}
                         </div>
-                        {member.memberType === "client" &&
+                        {(member.memberType === "client" || member.employeeInfo?.rol === "couch") &&
                           member.services.length > 0 && (
                             <div className="text-xs text-muted-foreground mt-1 flex flex-wrap gap-x-2 gap-y-1">
                               {member.services.map((service) => (
@@ -1223,7 +1223,7 @@ export function AccessControlAdmin() {
                       </div>
 
                       <div className="flex flex-wrap gap-2 sm:justify-end sm:flex-shrink-0">
-                        {member.memberType === "client" ? (
+                        {(member.memberType === "client" || member.employeeInfo?.rol === "couch") ? (
                           member.services.length > 0 ? (
                             <div className="flex flex-wrap gap-2 w-full sm:w-auto sm:justify-end">
                               {member.services.map((service) => {
@@ -1262,16 +1262,6 @@ export function AccessControlAdmin() {
                               Sin servicios activos
                             </Button>
                           )
-                        ) : member.employeeInfo?.rol === "couch" ? (
-                          <Button
-                            size="sm"
-                            className="text-xs w-full sm:w-auto"
-                            onClick={() => handleEmployeeCheckIn(member)}
-                            disabled={member.employeeInfo.estado !== 1 || isButtonLoading(`checkin-${member.id}`)}
-                          >
-                            <Plus className="h-3 w-3 mr-1" />
-                            {isButtonLoading(`checkin-${member.id}`) ? "Procesando..." : "Registrar ingreso al servicio"}
-                          </Button>
                         ) : (
                           <div className="flex flex-col gap-1 w-full sm:w-auto">
                             <div className="flex gap-2">
