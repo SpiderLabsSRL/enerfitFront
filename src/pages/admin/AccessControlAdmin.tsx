@@ -166,6 +166,7 @@ export function AccessControlAdmin() {
     const params = new URLSearchParams(location.search);
     const searchCi = params.get("search");
     if (searchCi) {
+      setTypeFilter("all");
       setSearchTerm(searchCi);
       navigate(location.pathname, { replace: true });
     }
@@ -465,6 +466,14 @@ export function AccessControlAdmin() {
         return;
       }
 
+      if (member.employeeInfo.rol === "couch") {
+        if (result.log) prependLog(result.log);
+        toast({ title: "Ingreso Registrado", description: `${member.name} - ${result.message}` });
+        setSelectedMember(null);
+        setSearchTerm("");
+        return;
+      }
+
       setMembers((prev) =>
         prev.map((m) =>
           m.id === member.id && m.employeeInfo
@@ -595,7 +604,7 @@ export function AccessControlAdmin() {
         if (result.success) {
           setMembers((prev) =>
             prev.map((m) =>
-              m.id === member.id
+              m.id === member.id && m.memberType === "client"
                 ? {
                     ...m,
                     services: m.services.map((s) =>
@@ -1106,13 +1115,12 @@ export function AccessControlAdmin() {
             )}
           </div>
 
-          {members.some((member) => member.memberType === "employee") && (
+          {members.some((member) => member.memberType === "employee" && member.employeeInfo?.rol !== "couch") && (
             <div className="mb-3 md:mb-4 p-2.5 md:p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs md:text-sm text-blue-700">
               <div className="flex items-start gap-2">
                 <Fingerprint className="h-4 w-4 flex-shrink-0 mt-0.5" />
                 <span>
-                  <strong>Nota:</strong> Los empleados solo pueden registrar
-                  acceso mediante huella digital
+                  <strong>Nota:</strong> Los empleados registran su jornada mediante huella digital, excepto recepción, que puede seleccionar jornada o entrenamiento.
                 </span>
               </div>
             </div>
@@ -1127,14 +1135,19 @@ export function AccessControlAdmin() {
               <div className="space-y-2">
                 {members.map((member) => (
                   <div
-                    key={member.id}
+                    key={`${member.memberType}-${member.id}`}
                     className="flex flex-col gap-3 p-3 bg-background rounded border"
                   >
                     <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                       <div className="flex-1 min-w-0">
                         <div className="font-medium text-sm md:text-base">
                           {member.name}
-                        </div>
+                            {members.some((m) => m.id === member.id && m.memberType !== member.memberType) && (
+                              <Badge variant="secondary" className="ml-2 text-xs">
+                                {member.memberType === "employee" ? "Jornada laboral" : "Entrenamiento"}
+                              </Badge>
+                            )}
+                          </div>
                         <div className="text-xs md:text-sm text-muted-foreground">
                           CI: {member.ci}
                         </div>
@@ -1170,6 +1183,8 @@ export function AccessControlAdmin() {
                                   {member.employeeInfo.rol}
                                 </span>
                               </span>
+                              {member.employeeInfo.rol !== "couch" && (
+                                <>
                               <span>
                                 Estado:{" "}
                                 <span
@@ -1194,7 +1209,10 @@ export function AccessControlAdmin() {
                                   Salida: {member.employeeInfo.lastCheckOut}
                                 </span>
                               )}
+                                </>
+                              )}
                               {member.employeeInfo.rol !== "admin" &&
+                                member.employeeInfo.rol !== "couch" &&
                                 !member.employeeInfo.trabajaHoy && (
                                   <span className="text-rose-600 font-medium">
                                     ⚠️ Hoy no trabaja
@@ -1244,6 +1262,16 @@ export function AccessControlAdmin() {
                               Sin servicios activos
                             </Button>
                           )
+                        ) : member.employeeInfo?.rol === "couch" ? (
+                          <Button
+                            size="sm"
+                            className="text-xs w-full sm:w-auto"
+                            onClick={() => handleEmployeeCheckIn(member)}
+                            disabled={member.employeeInfo.estado !== 1 || isButtonLoading(`checkin-${member.id}`)}
+                          >
+                            <Plus className="h-3 w-3 mr-1" />
+                            {isButtonLoading(`checkin-${member.id}`) ? "Procesando..." : "Registrar ingreso al servicio"}
+                          </Button>
                         ) : (
                           <div className="flex flex-col gap-1 w-full sm:w-auto">
                             <div className="flex gap-2">
@@ -1254,8 +1282,9 @@ export function AccessControlAdmin() {
                                     ? "outline"
                                     : "default"
                                 }
-                                disabled
-                                title="Solo disponible mediante huella digital"
+                                onClick={() => handleEmployeeCheckIn(member)}
+                                disabled={member.employeeInfo?.rol !== "recepcionista" || member.employeeInfo?.estado !== 1 || member.employeeInfo?.status === "in" || isButtonLoading(`checkin-${member.id}`)}
+                                title={member.employeeInfo?.rol === "recepcionista" ? "Registrar jornada laboral" : "Solo disponible mediante huella digital"}
                                 className="flex-1 text-xs"
                               >
                                 <Fingerprint className="h-3 w-3 mr-1" />
@@ -1268,8 +1297,9 @@ export function AccessControlAdmin() {
                                     ? "outline"
                                     : "secondary"
                                 }
-                                disabled
-                                title="Solo disponible mediante huella digital"
+                                onClick={() => handleEmployeeCheckOut(member)}
+                                disabled={member.employeeInfo?.rol !== "recepcionista" || member.employeeInfo?.estado !== 1 || member.employeeInfo?.status === "out" || isButtonLoading(`checkout-${member.id}`)}
+                                title={member.employeeInfo?.rol === "recepcionista" ? "Registrar jornada laboral" : "Solo disponible mediante huella digital"}
                                 className="flex-1 text-xs"
                               >
                                 <Fingerprint className="h-3 w-3 mr-1" />
@@ -1277,7 +1307,7 @@ export function AccessControlAdmin() {
                               </Button>
                             </div>
                             <div className="text-xs text-blue-600 text-center">
-                              Solo por huella digital
+                              {member.employeeInfo?.rol === "recepcionista" ? "Jornada laboral" : "Solo por huella digital"}
                             </div>
                           </div>
                         )}

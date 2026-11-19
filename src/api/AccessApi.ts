@@ -1,3 +1,4 @@
+
 import axios from "axios";
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
@@ -97,6 +98,7 @@ export interface Employee {
   ci: string;
   rol: string;
   trabajaHoy: boolean;
+  estado?: number;
   lastCheckIn?: string;
   lastCheckOut?: string;
   status?: "in" | "out";
@@ -300,6 +302,7 @@ const mapBackendEmployee = (
   ci: persona.ci,
   rol: employee.rol,
   trabajaHoy: employee.trabaja_hoy ?? true,
+  estado: employee.estado,
   lastCheckIn: normalizeDate(employee.ultimo_registro_entrada),
   lastCheckOut: normalizeDate(employee.ultimo_registro_salida),
   status: employee.estado_actual,
