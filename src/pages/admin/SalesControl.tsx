@@ -101,17 +101,24 @@ type DateFilterType =
 
 type TipoTab = "producto" | "servicio";
 
-function isSaleFromToday(fechaStr: string): boolean {
+function isSaleWithinLastWeek(fechaStr: string): boolean {
   try {
     const parts = fechaStr.split(", ");
     if (parts.length < 1) return false;
     const [day, month, year] = parts[0].split("/").map(Number);
-    const now = new Date();
-    return (
-      day === now.getDate() &&
-      month === now.getMonth() + 1 &&
-      year === now.getFullYear()
-    );
+    const saleDate = Date.UTC(year, month - 1, day);
+    const todayParts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "America/La_Paz",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).formatToParts(new Date());
+    const todayYear = Number(todayParts.find((p) => p.type === "year")?.value);
+    const todayMonth = Number(todayParts.find((p) => p.type === "month")?.value);
+    const todayDay = Number(todayParts.find((p) => p.type === "day")?.value);
+    const today = Date.UTC(todayYear, todayMonth - 1, todayDay);
+    const daysAgo = (today - saleDate) / 86400000;
+    return daysAgo >= 0 && daysAgo <= 7;
   } catch {
     return false;
   }
@@ -762,10 +769,10 @@ export function SalesControl() {
       });
       return;
     }
-    if (!isSaleFromToday(sale.fecha)) {
+    if (!isSaleWithinLastWeek(sale.fecha)) {
       toast({
         title: "No se puede anular",
-        description: "Solo se pueden anular ventas realizadas el día de hoy.",
+        description: "Solo se pueden anular ventas realizadas hoy o hasta 7 días atrás.",
         variant: "destructive",
       });
       return;
@@ -900,13 +907,13 @@ export function SalesControl() {
 
   const renderAnularButton = (sale: SaleRecord) => {
     if (!esAdmin) return null;
-    if (!isSaleFromToday(sale.fecha)) {
+    if (!isSaleWithinLastWeek(sale.fecha)) {
       return (
         <Button
           variant="ghost"
           size="icon"
           disabled
-          title="Solo se pueden anular ventas de hoy"
+          title="Solo se pueden anular ventas de hasta 7 días atrás"
           className="h-7 w-7 md:h-8 md:w-8 opacity-40"
         >
           <Lock className="h-3 w-3 md:h-4 md:w-4" />
@@ -1509,7 +1516,7 @@ export function SalesControl() {
                 </div>
               )}
 
-              {esAdmin && isSaleFromToday(selectedSale.fecha) && (
+              {esAdmin && isSaleWithinLastWeek(selectedSale.fecha) && (
                 <div className="pt-2 border-t">
                   <Button variant="destructive" className="w-full" onClick={() => handleOpenAnular(selectedSale)}>
                     <Trash2 className="h-4 w-4 mr-2" />

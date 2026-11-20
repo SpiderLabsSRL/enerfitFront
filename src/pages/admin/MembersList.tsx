@@ -287,6 +287,14 @@ const calculateAge = (birthDate: string | null | undefined): number | null => {
   }
 };
 
+const ServicePayment = ({ service }: { service: Service }) => (
+  <div className="rounded border p-3 text-sm space-y-1">
+    <div><span className="text-muted-foreground">Plan: </span><span className="font-medium">{service.name}</span></div>
+    <div><span className="text-muted-foreground">Monto pagado: </span><span className="font-medium">{service.montoPagado == null ? "Sin importe registrado o determinable" : `Bs. ${service.montoPagado.toFixed(2)}${service.montoEstimado ? " (estimado)" : ""}`}</span></div>
+    {service.montoEstimado && <p className="text-xs text-muted-foreground">Venta compartida: importe proporcional al precio del plan.</p>}
+  </div>
+);
+
 const MemberServices: React.FC<{
   services: Service[];
   onEditDates?: (service: Service) => void;
@@ -558,6 +566,7 @@ export function MembersList() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [serviceFilter, setServiceFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [sucursalFilter, setSucursalFilter] = useState("all");
   const [availableServices, setAvailableServices] = useState<string[]>([]);
   const [availableBranches, setAvailableBranches] = useState<
@@ -692,7 +701,7 @@ export function MembersList() {
           itemsPerPage,
           search,
           serviceFilter,
-          "all",
+          statusFilter,
           sucursalFilter,
         );
 
@@ -709,6 +718,7 @@ export function MembersList() {
           const existing = groupedMap.get(member.id);
 
           if (existing) {
+            if (member.status === "active") existing.status = "active";
             if (!existing.sucursales.includes(member.sucursal)) {
               existing.sucursales.push(member.sucursal);
             }
@@ -756,7 +766,7 @@ export function MembersList() {
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [itemsPerPage, serviceFilter, sucursalFilter],
+    [itemsPerPage, serviceFilter, statusFilter, sucursalFilter],
   );
 
   useEffect(() => {
@@ -768,11 +778,11 @@ export function MembersList() {
     }
 
     const shouldSearch = searchTerm.length === 0 || searchTerm.length >= 3;
-    if (!shouldSearch) return;
+
 
     searchTimeoutRef.current = setTimeout(() => {
       setCurrentPage(1);
-      loadMembers(1, searchTerm);
+      loadMembers(1, shouldSearch ? searchTerm : "");
     }, 600);
 
     return () => {
@@ -781,7 +791,7 @@ export function MembersList() {
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchTerm, serviceFilter, sucursalFilter]);
+  }, [searchTerm, serviceFilter, statusFilter, sucursalFilter]);
 
   useEffect(() => {
     if (skipPageEffectRef.current) {
@@ -1207,7 +1217,7 @@ export function MembersList() {
           <CardTitle>Buscar y Filtrar</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
             <div className="lg:col-span-2 search-section">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
@@ -1242,6 +1252,17 @@ export function MembersList() {
                         {service}
                       </SelectItem>
                     ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Select value={statusFilter} onValueChange={setStatusFilter} disabled={loading}>
+                <SelectTrigger><SelectValue placeholder="Estado" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos los estados</SelectItem>
+                  <SelectItem value="active">Activos</SelectItem>
+                  <SelectItem value="inactive">Inactivos</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -1323,6 +1344,17 @@ export function MembersList() {
                 </Select>
               </div>
 
+              <div>
+                <Select value={statusFilter} onValueChange={setStatusFilter} disabled={loading}>
+                  <SelectTrigger><SelectValue placeholder="Estado" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos los estados</SelectItem>
+                    <SelectItem value="active">Activos</SelectItem>
+                    <SelectItem value="inactive">Inactivos</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
               {userData?.rol === "admin" && (
                 <div>
                   <Label className="text-sm mb-1 block">Sucursal</Label>
@@ -1397,6 +1429,7 @@ export function MembersList() {
                   >
                     {searchTerm ||
                     serviceFilter !== "all" ||
+                     statusFilter !== "all" ||
                     sucursalFilter !== "all"
                       ? "No se encontraron miembros con los filtros actuales"
                       : "No hay miembros registrados"}
@@ -1539,6 +1572,7 @@ export function MembersList() {
             <CardContent className="py-8 text-center text-muted-foreground">
               {searchTerm ||
               serviceFilter !== "all" ||
+                     statusFilter !== "all" ||
               sucursalFilter !== "all"
                 ? "No se encontraron miembros con los filtros actuales"
                 : "No hay miembros registrados"}
@@ -1729,6 +1763,11 @@ export function MembersList() {
                 />
               </div>
 
+              <div className="space-y-2">
+                <Label>Planes y pagos registrados</Label>
+                {memberToEdit.services.length === 0 ? <p className="text-sm text-muted-foreground">Sin planes registrados</p> : memberToEdit.services.map((service) => <ServicePayment key={service.inscripcionId} service={service} />)}
+              </div>
+
               <div className="flex items-center space-x-2 pt-2">
                 <Checkbox
                   id="register-fingerprint"
@@ -1783,6 +1822,7 @@ export function MembersList() {
 
           {serviceToEditDates && (
             <div className="space-y-4 py-4">
+              <ServicePayment service={serviceToEditDates} />
               <div className="space-y-2">
                 <Label className="flex items-center gap-1">
                   <CalendarIcon className="h-4 w-4" />

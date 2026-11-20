@@ -14,6 +14,8 @@ export interface Service {
   ingresos_disponibles: number | null;
   coachId: number | null;
   coachNombre: string | null;
+  montoPagado?: number | null;
+  montoEstimado?: boolean;
 }
 
 export interface Member {
@@ -255,12 +257,11 @@ export const getAllMembers = async (
     const filteredMembers: Member[] =
       response.data?.map((member) => {
         const activeServices = filterActiveServices(member.services || []);
-        const isActive = activeServices.length > 0;
 
         return {
           ...member,
           services: activeServices,
-          status: isActive ? "active" : "inactive",
+          status: member.status,
         };
       }) || [];
 
