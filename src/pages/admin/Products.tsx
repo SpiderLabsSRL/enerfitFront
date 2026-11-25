@@ -45,6 +45,7 @@ import BarcodeScanner from "./BarcodeScanner";
 // ============================================
 interface ExtendedProductRequest {
   nombre: string;
+  descripcion?: string | null;
   precioVenta: number;
   sucursales: string[];
   stockPorSucursal: { [sucursalId: string]: number | null };
@@ -59,6 +60,7 @@ interface ExtendedProductRequest {
 interface Product {
   id: string;
   nombre: string;
+  descripcion?: string | null;
   precioVenta: number;
   precioCompra?: number | null;
   codigoBarras?: string | null;
@@ -293,6 +295,7 @@ export function Products() {
 
   const [formData, setFormData] = useState({
     nombre: "",
+    descripcion: "",
     precioVenta: "",
     precioCompra: "",
     codigoBarras: "",
@@ -386,6 +389,7 @@ export function Products() {
   const resetForm = () => {
     setFormData({
       nombre: "",
+      descripcion: "",
       precioVenta: "",
       precioCompra: "",
       codigoBarras: "",
@@ -502,6 +506,7 @@ export function Products() {
 
       setFormData({
         nombre: product.nombre,
+        descripcion: product.descripcion ?? "",
         precioVenta: product.precioVenta.toString(),
         precioCompra: product.precioCompra?.toString() || "",
         codigoBarras: product.codigoBarras || "",
@@ -593,6 +598,7 @@ export function Products() {
 
     const productRequest: ExtendedProductRequest = {
       nombre: formData.nombre,
+      descripcion: formData.descripcion.trim() || null,
       precioVenta,
       sucursales: formData.sucursales,
       stockPorSucursal,
@@ -1071,6 +1077,18 @@ export function Products() {
                       setFormData((prev) => ({ ...prev, nombre: e.target.value }))
                     }
                     placeholder="Ej: Proteína Whey"
+                  />
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="descripcion">Descripción (opcional)</Label>
+                  <textarea
+                    id="descripcion"
+                    rows={3}
+                    className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    value={formData.descripcion}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, descripcion: e.target.value }))}
+                    placeholder="Describe el producto"
                   />
                 </div>
 
