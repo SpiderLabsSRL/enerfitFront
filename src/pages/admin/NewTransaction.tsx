@@ -341,31 +341,28 @@ export function NewTransaction() {
     }
   };
 
-  // ✅ FIX: Formatea la fecha SIN conversión de zona horaria.
-  // El backend ya envía la hora correcta de Bolivia; el navegador NO debe convertirla.
+  // La columna fecha es TIMESTAMPTZ y el backend la envía como ISO en UTC
+  // (ej. "2026-11-26T17:18:29.747Z"). Se convierte explícitamente a la hora
+  // de Bolivia, sin depender de la zona horaria del servidor ni del navegador.
   const formatDate = (dateString: string) => {
     if (!dateString) return "—";
 
-    try {
-      // Soportar formatos:
-      //   "2026-10-04T18:00:00.000Z"
-      //   "2026-10-04T18:00:00"
-      //   "2026-10-04 18:00:00"
-      //   "2026-10-04 18:00:00+00"
-      const match = dateString.match(
-        /(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/
-      );
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return dateString;
 
-      if (match) {
-        const [, year, month, day, hour, minute] = match;
-        return `${day}/${month}/${year}, ${hour}:${minute}`;
-      }
+    const parts = new Intl.DateTimeFormat("es-BO", {
+      timeZone: "America/La_Paz",
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).formatToParts(date);
+    const get = (type: string) =>
+      parts.find((p) => p.type === type)?.value ?? "";
 
-      // Fallback si no matchea el patrón
-      return dateString;
-    } catch {
-      return dateString;
-    }
+    return `${get("day")}/${get("month")}/${get("year")}, ${get("hour")}:${get("minute")}`;
   };
 
   if (isLoading) {
